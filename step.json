@@ -1,0 +1,33 @@
+{
+  "id": "ingest members",
+  "runnerId": "JsRunner",
+  "config": {
+    "jsFile": "lib/index.js",
+    "methodName": "ingest"
+  },
+  "args": [
+    {
+      "id": "reader",
+      "type": "streamReader",
+      "sourceIds": [
+        "data", "metadata"
+      ]
+    },
+    {
+      "id": "metacollection",
+      "type": "string"
+    },
+    {
+      "id": "datacollections",
+      "type": "string"
+    },
+    {
+      "id": "indexCollection",
+      "type": "string"
+    },
+    {
+      "id": "database url",
+      "type": "string | null"
+    }
+  ]
+}
