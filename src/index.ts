@@ -1,75 +1,26 @@
+import type * as RDF from '@rdfjs/types';
 import { Stream } from "@treecg/connector-types";
+import { LDES, Member, PROV, RDF as RDFT, SDS } from '@treecg/types';
 import { MongoClient } from "mongodb";
-import { DataFactory, DefaultGraph, Parser, Quad, Store, Term, Writer } from "n3";
+import { Parser, Store, Writer } from "n3";
 import { env } from "process";
-
-const { namedNode } = DataFactory;
-
-type Member = {
-    id: string,
-    quads: Quad[],
-}
+import { Fragment, MongoFragment } from './fragmentors';
+import { TimestampFragmentor } from './fragmentors/timestamp';
+import { extractMetadata, getMember, interpretFragmentation } from './utils';
 
 type SR<T> = {
     [P in keyof T]: Stream<T[P]>;
 }
 
 type Data = {
-    data: Quad[],
-    metadata: Quad[],
+    data: RDF.Quad[],
+    metadata: RDF.Quad[],
 }
 
 
-type ExtractIndices = (member: Member) => any;
-
-interface Fragment {
-    id: string,
-    f: ExtractIndices,
-}
-
-const dGraph = new DefaultGraph();
-const ty = namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
-
-
-function getMember(subject: Term, store: Store, done: Set<Term>): Quad[] {
-    const newQuads = store.getQuads(subject, null, null, dGraph);
-    done.add(subject);
-
-    const newSubjects = newQuads.map(q => q.object)
-        .filter(q => q.termType === "BlankNode" || q.termType == "NamedNode")
-        .filter(q => !done.has(q))
-
-    return [...newQuads, ...newSubjects.flatMap(s => getMember(s, store, done))];
-}
-
-export function getMembersByType(type: Term, store: Store): Member[] {
-    return store.getSubjects(ty, type, null).map(sub => {
-        if (sub.termType !== "NamedNode") throw "Memmbers can only be named nodes!";
-
-        const quads = getMember(sub, store, new Set());
-        return { id: sub.value, quads };
-    });
-}
-
-
-function extractMetadata(meta: Quad[]): Member[] {
-    const store = new Store(meta);
-    return getMembersByType(namedNode("https://w3id.org/ldes#BucketizeStrategy"), store);
-}
-
-
-export function interpretFragmentation(fragmentation: Member): Fragment {
-    const bucketProperty = fragmentation.quads.find(quad => quad.subject.value === fragmentation.id && quad.predicate.equals(namedNode("https://w3id.org/ldes#bucketProperty")))?.object || namedNode("https://w3id.org/ldes#bucket");
-    const f = (a: Member) => a.quads.find(quad => quad.subject.value === a.id && quad.predicate.equals(bucketProperty))!.object.value;
-
-    return {
-        id: fragmentation.id, f
-    };
-}
-
-
-export async function ingest(sr: SR<Data>, metacollection: string, dataCollection: string, indexCollectionName: string, mUrl?: string) {
+export async function ingest(sr: SR<Data>, metacollection: string, dataCollection: string, indexCollectionName: string, timestampFragmentation?: string, mUrl?: string) {
     let state: Fragment[] = [];
+    let timestampPath: RDF.Term | undefined = undefined;
 
     const url = mUrl || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
 
@@ -84,52 +35,75 @@ export async function ingest(sr: SR<Data>, metacollection: string, dataCollectio
 
     state = dbFragmentations.map(interpretFragmentation);
 
-
-    const updateFragmentation = async (id: string, quads: Quad[]) => {
-        const ser = new Writer().quadsToString(quads);
-        await metaCollection.updateOne({ "type": "fragmentation", "id": id }, { $set: { value: ser } }, {upsert: true});
-    };
-
-    const handleMetadata = async (meta: Quad[]) => {
-        const members = extractMetadata(meta);
-        state = members.map(interpretFragmentation);
-
-        await Promise.all(members.map(member => updateFragmentation(member.id, member.quads)));
-    };
-
-    sr.metadata.data(handleMetadata);
-    if(sr.metadata.lastElement) {
-        handleMetadata(sr.metadata.lastElement);
+    if (timestampFragmentation) {
+        state.push(new TimestampFragmentor(timestampFragmentation));
     }
 
 
+    const updateFragmentation = async (id: string, quads: RDF.Quad[]) => {
+        const ser = new Writer().quadsToString(quads);
+        await metaCollection.updateOne({ "type": "fragmentation", "id": id }, { $set: { value: ser } }, { upsert: true });
+    };
 
+    const handleMetadata = async (meta: RDF.Quad[]) => {
+        const store = new Store(meta);
+
+        const stream = store.getSubjects(RDFT.terms.type, SDS.terms.Stream, null)
+            .find(sub => store.getQuads(null, PROV.terms.used, sub, null).length === 0);
+        const streamMember = getMember(stream!, store, new Set());
+
+        if (stream) {
+            const datasetId = store.getObjects(stream!, SDS.terms.dataset, null)[0];
+            if (datasetId) {
+                timestampPath = store.getObjects(datasetId, LDES.terms.timestampPath, null)[0];
+            }
+
+            const ser = new Writer().quadsToString(streamMember);
+            await metaCollection.updateOne({ "type": SDS.Stream, "id": stream!.value }, { $set: { value: ser } }, { upsert: true });
+        }
+
+        console.log("stream", stream, timestampPath);
+
+        const members = extractMetadata(meta);
+        state = members.map(interpretFragmentation);
+
+        if (timestampFragmentation) {
+            state.push(new TimestampFragmentor(timestampFragmentation));
+        }
+
+        await Promise.all(members.map(member => updateFragmentation(member.id.value, member.quads)));
+    };
+
+    sr.metadata.data(handleMetadata);
+    if (sr.metadata.lastElement) {
+        handleMetadata(sr.metadata.lastElement);
+    }
 
     const memberCollection = db.collection(dataCollection);
-    const indexCollection = db.collection(indexCollectionName);
+    const indexCollection = db.collection<MongoFragment>(indexCollectionName);
 
     sr.data.data(async (data) => {
-        const id = data[0].subject.value;
-        const present = await memberCollection.count({ id: id }) > 0;
+        const id = data[0].subject;
+        const present = await memberCollection.count({ id: id.value }) > 0;
 
         if (!present) {
+            let timestampValue = undefined;
+
+            if (!!timestampPath) {
+                timestampValue = data.find(quad => quad.subject.equals(id) && quad.predicate.equals(timestampPath!))?.object.value
+            }
+
             const ser = new Writer().quadsToString(data);
-            await memberCollection.insertOne({ id: id, data: ser });
+            await memberCollection.insertOne({ id: id.value, data: ser, timestamp: timestampValue });
         }
 
         const currentFragmentations = await indexCollection.find({ memberId: id }).map(entry => <string>entry.fragmentId).toArray();
         const fragmentIsNotPresent = (fragment: Fragment) => currentFragmentations.every(seen => seen != fragment.id);
 
-        const newFragments = state.filter(fragmentIsNotPresent).map(fragment => {
-            const indices = fragment.f({ id, quads: data });
-
-            return {
-                fragmentId: fragment.id,
-                memberId: id,
-                indices
-            };
+        const promises = state.filter(fragmentIsNotPresent).map(fragment => {
+            return fragment.extract({ id, quads: data }, indexCollection, timestampPath);
         });
 
-        await indexCollection.insertMany(newFragments);
+        await Promise.all(promises);
     });
 }
