@@ -6,7 +6,7 @@ import { Parser, Store, Writer } from "n3";
 import { env } from "process";
 import { Fragment, MongoFragment } from './fragmentors';
 import { TimestampFragmentor } from './fragmentors/timestamp';
-import { extractMetadata, getMember, interpretFragmentation } from './utils';
+import { extractBucketStrategies, getMember, interpretBucketstrategy } from './utils';
 
 type SR<T> = {
     [P in keyof T]: Stream<T[P]>;
@@ -19,7 +19,6 @@ type Data = {
 
 
 export async function ingest(sr: SR<Data>, metacollection: string, dataCollection: string, indexCollectionName: string, timestampFragmentation?: string, mUrl?: string) {
-    let state: Fragment[] = [];
     let timestampPath: RDF.Term | undefined = undefined;
 
     const url = mUrl || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
@@ -27,18 +26,18 @@ export async function ingest(sr: SR<Data>, metacollection: string, dataCollectio
     // Connect to database
     const mongo = await new MongoClient(url).connect();
     const db = mongo.db();
+
     const metaCollection = db.collection(metacollection);
 
     const dbFragmentations: Member[] = await metaCollection.find({ "type": "fragmentation" })
         .map(entry => { return { id: entry.id, quads: new Parser().parse(entry.value) } })
         .toArray();
 
-    state = dbFragmentations.map(interpretFragmentation);
+    let state: Fragment[] = dbFragmentations.map(interpretBucketstrategy);
 
     if (timestampFragmentation) {
         state.push(new TimestampFragmentor(timestampFragmentation));
     }
-
 
     const updateFragmentation = async (id: string, quads: RDF.Quad[]) => {
         const ser = new Writer().quadsToString(quads);
@@ -62,19 +61,18 @@ export async function ingest(sr: SR<Data>, metacollection: string, dataCollectio
             await metaCollection.updateOne({ "type": SDS.Stream, "id": stream!.value }, { $set: { value: ser } }, { upsert: true });
         }
 
-        console.log("stream", stream, timestampPath);
-
-        const members = extractMetadata(meta);
-        state = members.map(interpretFragmentation);
+        const bucketStrategies = extractBucketStrategies(meta);
+        state = bucketStrategies.map(interpretBucketstrategy);
 
         if (timestampFragmentation) {
             state.push(new TimestampFragmentor(timestampFragmentation));
         }
 
-        await Promise.all(members.map(member => updateFragmentation(member.id.value, member.quads)));
+        await Promise.all(bucketStrategies.map(member => updateFragmentation(member.id.value, member.quads)));
     };
 
     sr.metadata.data(handleMetadata);
+
     if (sr.metadata.lastElement) {
         handleMetadata(sr.metadata.lastElement);
     }
@@ -82,7 +80,9 @@ export async function ingest(sr: SR<Data>, metacollection: string, dataCollectio
     const memberCollection = db.collection(dataCollection);
     const indexCollection = db.collection<MongoFragment>(indexCollectionName);
 
+    console.log("here");
     sr.data.data(async (data) => {
+        console.log("data", data);
         const id = data[0].subject;
         const present = await memberCollection.count({ id: id.value }) > 0;
 

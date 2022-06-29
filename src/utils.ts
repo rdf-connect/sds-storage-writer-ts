@@ -26,13 +26,13 @@ export function getMembersByType(type: RDF.Term, store: Store): Member[] {
 }
 
 
-export function extractMetadata(meta: RDF.Quad[]): Member[] {
+export function extractBucketStrategies(meta: RDF.Quad[]): Member[] {
     const store = new Store(meta);
     return getMembersByType(LDES.terms.BucketizeStrategy, store);
 }
 
 
-export function interpretFragmentation(fragmentation: Member): Fragment {
+export function interpretBucketstrategy(fragmentation: Member): Fragment {
     const bucketProperty = fragmentation.quads.find(
         quad => quad.subject.value === fragmentation.id.value
             && quad.predicate.equals(LDES.terms.bucketProperty)

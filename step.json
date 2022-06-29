@@ -1,5 +1,5 @@
 {
-  "id": "ingest members",
+  "id": "ingest_members",
   "runnerId": "JsRunner",
   "config": {
     "jsFile": "lib/index.js",
