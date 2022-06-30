@@ -16,7 +16,12 @@ export class SubjectFragmentor implements Fragment {
         const value = member.quads.find(
             quad => quad.subject.equals(member.id)
                 && quad.predicate.equals(this.bucketProperty)
-        )!.object.value;
+        )?.object.value;
+
+        if(!value) {
+            console.error(`didn't find bucketProperty ${this.bucketProperty.value} on member ${member.id.value}`); 
+            return;
+        }
 
         const timestampValue = timestampPath ? member.quads.find(
             quad => quad.subject.equals(member.id) && quad.predicate.equals(timestampPath)

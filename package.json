@@ -20,9 +20,10 @@
   },
   "dependencies": {
     "@treecg/bucketizers": "^2.0.0",
+    "@treecg/connector-types": "^1.1.2",
     "@treecg/types": "^0.3.0",
-    "@treecg/connector-types": "^1.1.1",
     "mongodb": "^4.7.0",
-    "n3": "^1.16.2"
+    "n3": "^1.16.2",
+    "winston": "^3.8.0"
   }
 }
