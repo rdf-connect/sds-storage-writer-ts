@@ -1,12 +1,16 @@
 {
-  "name": "ldes-ingestor",
-  "version": "1.0.0",
+  "name": "@treecg/sds-storage-writer-mongo",
+  "version": "0.0.1-a.1",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
+  "type": "lib/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "jest"
   },
+  "files": [
+      "lib/**/*"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
