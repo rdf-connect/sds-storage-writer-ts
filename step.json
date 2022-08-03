@@ -26,7 +26,7 @@
       "type": "string"
     },
     {
-      "id": "timestamp fragmentation id",
+      "id": "timestamp_fragmentation_id",
       "type": "string | null"
     },
     {
