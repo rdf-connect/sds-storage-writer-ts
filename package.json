@@ -1,6 +1,6 @@
 {
   "name": "@treecg/sds-storage-writer-mongo",
-  "version": "0.0.1-a.1",
+  "version": "0.0.2",
   "description": "",
   "main": "lib/index.js",
   "type": "lib/index.d.ts",

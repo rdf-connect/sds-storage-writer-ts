@@ -2,11 +2,10 @@ import type * as RDF from '@rdfjs/types';
 import { Stream } from "@treecg/connector-types";
 import { LDES, Member, PROV, RDF as RDFT, RelationType, SDS } from '@treecg/types';
 import { MongoClient } from "mongodb";
-import { Parser, Store, Term, Writer } from "n3";
+import { Parser, Writer } from "n3";
 import { env } from "process";
 import winston from 'winston';
 import { handleTimestampPath, MongoFragment } from './fragmentHelper';
-import { extractBucketStrategies, getMember } from './utils';
 
 const consoleTransport = new winston.transports.Console();
 const logger = winston.createLogger({
@@ -59,7 +58,8 @@ export async function ingest(
     dataCollection: string,
     indexCollectionName: string,
     timestampFragmentation?: string,
-    mUrl?: string
+    mUrl?: string,
+    maxSize = 10
 ) {
     const url = mUrl || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
     logger.debug("Using mongo url " + url);
@@ -217,7 +217,7 @@ export async function ingest(
             if (buckets.length == 0) {
                 console.log("no buckets found, only handling timestamp thing")
                 if (timestampValue) {
-                    await handleTimestampPath("", stream.value, timestampPath!.value, timestampValue, memberId.value, indexCollection);
+                    await handleTimestampPath("", stream.value, timestampPath!.value, timestampValue, memberId.value, indexCollection, maxSize);
                 } else {
                     // no bucket and no timestamp value :(
                     logger.debug("No timestamp path or bucket found, what is life?");
@@ -257,7 +257,7 @@ export async function ingest(
                     console.log(timestampPath!.value);
                     await Promise.all(
                         buckets.map(bucket =>
-                            handleTimestampPath(bucket.value, stream.value, timestampPath!.value, timestampValue, memberId.value, indexCollection)
+                            handleTimestampPath(bucket.value, stream.value, timestampPath!.value, timestampValue, memberId.value, indexCollection, maxSize)
                         )
                     );
                 } else {

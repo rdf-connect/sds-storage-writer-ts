@@ -20,10 +20,8 @@ export interface Fragment {
     extract: ExtractIndices,
 }
 
-const maxSize = 2;
-
 //TODO! timestampValue is a date
-export async function handleTimestampPath(id: string, streamId: string, path: string, timestampValue: string, memberId: string, mongo: Collection<MongoFragment>) {
+export async function handleTimestampPath(id: string, streamId: string, path: string, timestampValue: string, memberId: string, mongo: Collection<MongoFragment>, maxSize: number) {
     const smallerIndex: undefined | MongoFragment = (await mongo.find({ leaf: true, id, streamId, timeStamp: { $lte: timestampValue } }).sort({ timeStamp: -1 }).limit(1).toArray())[0];
 
     if (smallerIndex) {
@@ -43,7 +41,7 @@ export async function handleTimestampPath(id: string, streamId: string, path: st
             await mongo.insertOne({ leaf: true, streamId, id, count: 1, relations, members: [memberId], timeStamp: timestampValue });
         }
     } else {
-        const largerIndex: undefined | MongoFragment = (await mongo.find({ leaf: true, id,  streamId }).sort({ timeStamp: -1 }).limit(1).toArray())[0];
+        const largerIndex: undefined | MongoFragment = (await mongo.find({ leaf: true, id, streamId }).sort({ timeStamp: -1 }).limit(1).toArray())[0];
         const relations: MongoFragment["relations"] = [];
 
         if (!!largerIndex) {
@@ -52,7 +50,7 @@ export async function handleTimestampPath(id: string, streamId: string, path: st
             await mongo.updateOne({ leaf: true, streamId, id, timeStamp: largerIndex.timeStamp, path }, { "$push": { relations: { type: RelationType.LessThan, value: largerIndex.timeStamp!, bucket: timestampValue } } })
         }
 
-        await mongo.insertOne({ leaf: true, streamId, id, count: 1, relations, members: [memberId], timeStamp: timestampValue  });
+        await mongo.insertOne({ leaf: true, streamId, id, count: 1, relations, members: [memberId], timeStamp: timestampValue });
     }
 }
 

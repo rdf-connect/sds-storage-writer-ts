@@ -32,6 +32,10 @@
     {
       "id": "database url",
       "type": "string | null"
+    },
+    {
+      "id": "fragment size",
+      "type": "number | null"
     }
   ]
 }
