@@ -57,7 +57,6 @@ export async function ingest(
     metacollection: string,
     dataCollection: string,
     indexCollectionName: string,
-    timestampFragmentation?: string,
     mUrl?: string,
     maxSize = 10
 ) {

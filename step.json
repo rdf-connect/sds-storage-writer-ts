@@ -26,10 +26,6 @@
       "type": "string"
     },
     {
-      "id": "timestamp_fragmentation_id",
-      "type": "string | null"
-    },
-    {
       "id": "database url",
       "type": "string | null"
     },
