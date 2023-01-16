@@ -1,0 +1,87 @@
+@prefix js: <https://w3id.org/conn/js#> .
+@prefix fno: <https://w3id.org/function/ontology#> .
+@prefix fnom: <https://w3id.org/function/vocabulary/mapping#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix : <https://w3id.org/conn#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+js:Ingest a js:JsProcess;
+  js:file "./lib/index.js";
+  js:function "ingest";
+  js:location <./>;
+  js:mapping [
+    a fno:Mapping;
+    fno:parameterMapping [
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:dataInput ;
+      fnom:implementationParameterPosition "0"^^xsd:int
+    ], [
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:metadataInput ;
+      fnom:implementationParameterPosition "1"^^xsd:int
+    ],[
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:metadataCollection ;
+      fnom:implementationParameterPosition "2"^^xsd:int
+    ],[
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:dataCollection ;
+      fnom:implementationParameterPosition "3"^^xsd:int
+    ],[
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:indexCollection ;
+      fnom:implementationParameterPosition "4"^^xsd:int
+    ],[
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:databaseUrl ;
+      fnom:implementationParameterPosition "5"^^xsd:int
+    ],[
+      a fnom:PositionParameterMapping ;
+      fnom:functionParameter js:pageSize ;
+      fnom:implementationParameterPosition "6"^^xsd:int
+    ]
+  ].
+
+[] a sh:NodeShape;
+  sh:targetClass js:Ingest;
+  sh:property [
+    sh:class :ReaderChannel;
+    sh:path js:dataInput;
+    sh:name "Data Input channel";
+    sh:minCount 1;
+  ], [
+    sh:class :ReaderChannel;
+    sh:path js:metadataInput;
+    sh:name "Metadata Input Channel";
+    sh:minCount 1;
+  ], [
+    sh:datatype xsd:string;
+    sh:path js:metadataCollection;
+    sh:minCount 1;
+    sh:defaultValue "meta";
+    sh:name "Name of the metadata collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path js:dataCollection;
+    sh:minCount 1;
+    sh:name "Name of the data collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path js:indexCollection;
+    sh:minCount 1;
+    sh:name "Name of the index collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path js:databaseUrl;
+    sh:minCount 0;
+    sh:defaultValue "mongodb://localhost:27017/ldes";
+    sh:name "Connection url used to connect to the mongo database";
+  ], [
+    sh:datatype xsd:integer;
+    sh:path js:pageSize;
+    sh:minCount 0;
+    sh:defaultValue 50;
+    sh:name "Used page size for the timestamp fragmentation";
+  ].
+
+

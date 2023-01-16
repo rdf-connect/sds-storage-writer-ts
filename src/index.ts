@@ -53,21 +53,23 @@ function filterMember(quads: RDF.Quad[], id: RDF.Term, blacklist: DenyQuad[] = [
 
 
 export async function ingest(
-    sr: SR<Data>,
+    data: Stream<RDF.Quad[]>,
+    metadata: Stream<RDF.Quad[]>,
     metacollection: string,
     dataCollection: string,
     indexCollectionName: string,
     mUrl?: string,
     maxSize = 10
 ) {
+    console.log({ data, metadata, metacollection, dataCollection, indexCollectionName, mUrl, maxSize });
     const url = mUrl || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
     logger.debug("Using mongo url " + url);
 
     // Connect to database
     const mongo = await new MongoClient(url).connect();
-    logger.debug("Connected");
 
     const db = mongo.db();
+    logger.debug("Connected");
 
     const streamTimestampPaths: { [streamId: string]: RDF.Term } = {};
 
@@ -83,23 +85,26 @@ export async function ingest(
         }
     };
 
-    sr.metadata.on("end", () => {
+    metadata.on("end", () => {
         ingestMetadata = false;
         return closeMongo();
     });
 
-    sr.data.on("end", () => {
+    data.on("end", () => {
         ingestData = false;
         return closeMongo();
     });
 
+    console.log("Done setting up end callbacks");
     const metaCollection = db.collection(metacollection);
+    console.log("Found meta collection ", metaCollection);
     const dbFragmentations: Member[] = await metaCollection.find({ "type": "fragmentation" })
-        .map(entry => { return { id: entry.id, quads: new Parser().parse(entry.value) } })
+        .map(entry => { console.log("Found entry", entry); return { id: entry.id, quads: new Parser().parse(entry.value) } })
         .toArray();
     logger.debug(`Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(x => x.id.value)})`);
 
     const handleMetadata = async (meta: RDF.Quad[]) => {
+        console.log("ingest: Handling metadata")
         if (!ingestMetadata) {
             logger.error("Cannot handle metadata, mongo is closed");
             return;
@@ -129,16 +134,19 @@ export async function ingest(
         }
     };
 
-    sr.metadata.data(handleMetadata);
+    metadata.data(handleMetadata);
 
-    if (sr.metadata.lastElement) {
-        handleMetadata(sr.metadata.lastElement);
+    if (metadata.lastElement) {
+        handleMetadata(metadata.lastElement);
     }
+
+    console.log("Attached metadata handler");
 
     const memberCollection = db.collection(dataCollection);
     const indexCollection = db.collection<MongoFragment>(indexCollectionName);
 
-    sr.data.data(async (data: RDF.Quad[]) => {
+    data.data(async (data: RDF.Quad[]) => {
+        console.log("ingest: Handling data")
         if (!ingestData) {
             logger.error("Cannot handle data, mongo is closed");
             return;
@@ -267,5 +275,6 @@ export async function ingest(
             }
         }
     });
+    console.log("Attached data handler");
 }
 
