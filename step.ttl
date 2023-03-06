@@ -6,7 +6,7 @@
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 
 js:Ingest a js:JsProcess;
-  js:file "./lib/index.js";
+  js:file <./lib/index.js>;
   js:function "ingest";
   js:location <./>;
   js:mapping [
@@ -83,5 +83,4 @@ js:Ingest a js:JsProcess;
     sh:defaultValue 50;
     sh:name "Used page size for the timestamp fragmentation";
   ].
-
 
