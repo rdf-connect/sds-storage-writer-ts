@@ -7,7 +7,7 @@ export type MongoFragment = {
   id?: string,
   streamId: string,
   value?: string,
-  relations: { type: RelationType, value: string, bucket: string, path?: string, timestampRelation?: boolean }[],
+  relations: { type: RelationType, value?: string, bucket: string, path?: string, timestampRelation?: boolean }[],
   members?: string[],
   count: number,
   timeStamp?: string
@@ -36,12 +36,16 @@ export async function handleTimestampPath(id: string, streamId: string, path: st
   // if there is a smallerIndex, relate to it
   if (smallerIndex) {
     relations.push({ type: RelationType.LessThan, value: timestampValue, bucket: smallerIndex.timeStamp!, path, timestampRelation: true });
-    await mongo.updateOne({ streamId, id, timeStamp: smallerIndex.timeStamp }, { "$push": { relations: { path, type: RelationType.GreaterThanOrEqualTo, value: timestampValue, bucket: timestampValue, timestampRelation: true } } })
+    await mongo.updateOne({ streamId, id, timeStamp: smallerIndex.timeStamp },
+      { "$push": { relations: { path, type: RelationType.GreaterThanOrEqualTo, value: timestampValue, bucket: timestampValue, timestampRelation: true } },
+        "$set": { immutable: true } 
+      })
   }
 
   // There is no smaller index, let's see if there is a larger index 
   const largerIndex: undefined | MongoFragment = (await mongo.find({ id, streamId, timeStamp: { "$gt": timestampValue } }).sort({ timeStamp: -1 }).limit(1).toArray())[0];
   if (!!largerIndex) {
+    // This should not happen I think
     // We potentially add a greater than or equal to relation to the next bucket
     relations.push({ type: RelationType.GreaterThanOrEqualTo, value: largerIndex.timeStamp!, bucket: largerIndex.timeStamp!, path, timestampRelation: true });
     // And to that bucket, we add a less then relation to the new bucket

@@ -26,9 +26,9 @@ type Record = {
 
 type Relation = {
   type: RelationType,
-  value: string,
+  value?: string,
   bucket: string,
-  path: string,
+  path?: string,
 };
 
 type Bucket = {
@@ -36,6 +36,7 @@ type Bucket = {
   root: boolean,
   stream: string,
   relations: Relation[],
+  immutable?: boolean,
 };
 
 type DenyQuad = (q: RDF.Quad, currentId: RDF.Term) => boolean;
@@ -97,15 +98,27 @@ function getRelatedBuckets(quads: RDF.Quad[], bucket: RDF.Term, done: Set<string
   return set;
 }
 
+function parseBool(bo?: string): boolean {
+  if (!bo) {
+    return false;
+  } else {
+    const bos = bo.toLowerCase();
+    return bos === "t" || bos === "true" || bos === "1"
+  }
+}
 
 function gatherBuckets(buckets: Bucket[], data: RDF.Quad[], subject: RDF.Term, stream: string, found: Set<string>) {
+  console.log("Immutable quads");
+  console.log(data.filter(x => x.predicate.equals(SDS.terms.custom("immutable"))));
   for (let bucket of getRelatedBuckets(data, subject, found)) {
     const isRoot = data.find(q => q.subject.equals(bucket) && q.predicate.equals(SDS.terms.custom("isRoot")))?.object.value;
+    const immutable = data.find(q => q.subject.equals(bucket) && q.predicate.equals(SDS.terms.custom("immutable")))?.object.value;
     const b = {
       root: isRoot === "true",
       id: bucket.value,
       relations: <Relation[]>[],
       stream,
+      immutable: parseBool(immutable),
     };
 
     const relations = data.filter(q => q.subject.equals(bucket) && q.predicate.equals(SDS.terms.relation)).map(x => x.object);
@@ -114,8 +127,8 @@ function gatherBuckets(buckets: Bucket[], data: RDF.Quad[], subject: RDF.Term, s
 
       const type = <RelationType>relObj.find(q => q.predicate.equals(SDS.terms.relationType))!.object.value;
       const target = relObj.find(q => q.predicate.equals(SDS.terms.relationBucket))!.object.value;
-      const path = relObj.find(q => q.predicate.equals(SDS.terms.relationPath))!.object.value;
-      const value = relObj.find(q => q.predicate.equals(SDS.terms.relationValue))!.object.value;
+      const path = relObj.find(q => q.predicate.equals(SDS.terms.relationPath))?.object.value;
+      const value = relObj.find(q => q.predicate.equals(SDS.terms.relationValue))?.object.value;
 
       b.relations.push({ type, bucket: target, path, value });
     }
@@ -165,11 +178,17 @@ async function addDataRecord(updateRecords: any[], record: Record, quads: RDF.Qu
 }
 
 const setRoots: Set<string> = new Set();
+const immutables: Set<string> = new Set();
 async function addBucket(bucket: Bucket, collection: Collection<MongoFragment>) {
   // Handle root setting
   if (bucket.root && !setRoots.has(bucket.stream)) {
     setRoots.add(bucket.stream);
     await collection.updateOne({ streamId: bucket.stream, id: bucket.id }, { $set: { root: true } }, { upsert: true });
+  }
+
+  if (bucket.immutable && !immutables.has(bucket.id)) {
+    immutables.add(bucket.id);
+    await collection.updateOne({ streamId: bucket.stream, id: bucket.id }, { $set: { immutable: true } }, { upsert: true });
   }
 
   for (let newRelation of bucket.relations) {
@@ -307,7 +326,7 @@ export async function ingest(
       await addDataRecord(updateData, r, data, memberCollection);
     }
 
-    if(updateData.length > 0) {
+    if (updateData.length > 0) {
       await memberCollection.insertMany(
         updateData
       );
@@ -324,7 +343,7 @@ export async function ingest(
       r.buckets.forEach(b => gatherBuckets(buckets, data, b, r.stream, found));
     }
 
-    for(let bucket of buckets) {
+    for (let bucket of buckets) {
       await addBucket(bucket, indexCollection);
     }
   });
