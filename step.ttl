@@ -4,8 +4,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix : <https://w3id.org/conn#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix dc: <http://purl.org/dc/terms/>.
 
 js:Ingest a js:JsProcess;
+  dc:title "LDES-server ingestor (mongoDB)";
+  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Eventstream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a timestamp fragmentation for the leaves.";
   js:file <./lib/index.js>;
   js:function "ingest";
   js:location <./>;
