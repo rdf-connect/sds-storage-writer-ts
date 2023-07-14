@@ -205,7 +205,7 @@ async function setup_metadata(metadata: Stream<RDF.Quad[]>, metaCollection: Coll
   });
 
   const dbFragmentations: Member[] = await metaCollection.find({ "type": "fragmentation" })
-    .map(entry => { console.log("Found entry", entry); return { id: entry.id, quads: new Parser().parse(entry.value) } })
+    .map(entry => { /*console.log("Found entry", entry);*/ return { id: entry.id, quads: new Parser().parse(entry.value) } })
     .toArray();
 
   logger.debug(`Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(x => x.id.value)})`);
@@ -319,7 +319,7 @@ export async function ingest(
     }
 
     const records = gatherRecords(data, streamTimestampPaths);
-    console.log(`ingest: Handling ${records.length} records`);
+    //console.log(`ingest: Handling ${records.length} records`);
 
     const updateData: any[] = [];
     for (let r of records) {
