@@ -1,20 +1,26 @@
 {
   "name": "@treecg/sds-storage-writer-mongo",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "jest"
+    "test": "bun test"
   },
   "files": [
     "lib/**/*",
     "step.ttl"
   ],
-  "keywords": ["SDS", "TREE", "LDES", "MongoBD"],
+  "keywords": [
+    "SDS",
+    "TREE",
+    "LDES",
+    "MongoBD"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@ajuvercr/js-runner": "^0.1.7",
     "@types/jest": "^29.5.2",
     "@types/node": "^20.4.0",
     "jest": "^29.6.1",
@@ -24,7 +30,6 @@
   },
   "dependencies": {
     "@treecg/bucketizers": "^2.1.12",
-    "@treecg/connector-types": "^1.2.1",
     "@treecg/types": "^0.4.5",
     "mongodb": "^4.7.0",
     "n3": "^1.17.0",
