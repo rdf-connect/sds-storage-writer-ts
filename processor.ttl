@@ -40,7 +40,7 @@
 
 js:Ingest a js:JsProcess;
   dc:title "LDES-server ingestor (mongoDB)";
-  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Eventstream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a timestamp fragmentation for the leaves.";
+  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
   js:file <./lib/index.js>;
   js:function "ingest";
   js:location <./>;
@@ -62,6 +62,10 @@ js:Ingest a js:JsProcess;
       a fnom:PositionParameterMapping;
       fnom:functionParameter "Page Size";
       fnom:implementationParameterPosition "3"^^xsd:int;
+    ], [
+      a fnom:PositionParameterMapping;
+      fnom:functionParameter "Branch Size";
+      fnom:implementationParameterPosition "4"^^xsd:int;
     ];
   ].
 
@@ -89,7 +93,13 @@ js:Ingest a js:JsProcess;
     sh:datatype xsd:integer;
     sh:path js:pageSize;
     sh:maxCount 1;
-    sh:defaultValue 50;
+    sh:defaultValue 100;
     sh:name "Page Size";
+  ], [
+    sh:datatype xsd:integer;
+    sh:path js:branchSize;
+    sh:maxCount 1;
+    sh:defaultValue 4;
+    sh:name "Branch Size";
   ].
 

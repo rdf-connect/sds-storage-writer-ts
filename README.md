@@ -1,11 +1,13 @@
-# A storage writer for mongo
+# A SDS storage writer for MongoDB
 
-Given an [SDS stream](https://w3id.org/sds/specification) and a stream of members, will write everything to a MongoDB instance.
-This stream is divided into 2 streams, a metadata stream and a data stream.
+[![Bun CI](https://github.com/TREEcg/sds-storage-writer-mongo/actions/workflows/build-test.yml/badge.svg)](https://github.com/TREEcg/sds-storage-writer-mongo/actions/workflows/build-test.yml) [![npm](https://img.shields.io/npm/v/@treecg/sds-storage-writer-mongo.svg?style=popout)](https://npmjs.com/package/@treecg/sds-storage-writer-mongo)
 
-Items on the metadata stream are stored in the metadata collection so the LDES server can find this metadata back. If a timestamp path as part of the dataset is found, the storage writer will dynamically start up a timestamp fragmentation. 
+Given an [SDS stream](https://w3id.org/sds/specification) and its correspondent stream of members, this processor will write everything into a MongoDB instance.
 
-Items on the data stream have the following shape:
+SDS stream updates are stored into MongoDB collections for the LDES server to find this information when serving requests. If a `ldes:timestampPath` property is given as part of the dataset metadata, the storage writer will automatically start up a timestamp fragmentation, based on a B+ Tree strategy.
+
+An example of a SDS data stream with a predefined fragmentation strategy is shown next:
+
 ```turtle
 # Member ex:sample1 exists
 ex:sample1 a ex:Object;
@@ -29,57 +31,55 @@ ex:sample1 a ex:Object;
 
 With this information, the data of the member is stored in the MongoDB collection, and the required relations are also stored in the database.
 
-
 ## Usage
+
+### As a [Connector Architecture](https://the-connector-architecture.github.io/site/docs/1_Home) processor
+
+This repository exposes the Connector Architecture processor [`js:Ingest`](https://github.com/TREEcg/sds-storage-writer-mongo/blob/master/configs/processor.ttl#L41), which can be used within data processing pipelines to write a SDS streams into a MongoDB instance. The processor can be configured as follows:
+
+```turtle
+@prefix : <https://w3id.org/conn#>.
+@prefix js: <https://w3id.org/conn/js#>.
+@prefix sh: <http://www.w3.org/ns/shacl#>.
+
+[ ] a js:Ingest;
+  js:dataInput <inputDataReader>;
+  js:metadataInput <inputMetadataReader>;
+  js:database [
+    js:url <http://myLDESView.org>;
+    js:metadata "METADATA";
+    js:data "DATA";
+    js:index "INDEX";
+  ];
+  js:pageSize 500;
+  js:branchSize 4.
+```
+
+### As a library
 
 The library exposes one function `ingest`, which handles everything.
 
 ```typescript
-async function ingest(streamReader: {data: Stream<Quad[]>, metadata: Stream<Quad[]>}, metacollection: string, dataCollection: string, indexCollection: string, timestampFragmentation?: string, mongoUrl?: string) { /* snip */ }
+async function ingest(
+  data: Stream<string | Quad[]>, 
+  metadata: Stream<string | RDF.Quad[]>, 
+  database: DBConfig,
+  maxsize: number = 100,
+  k: number = 4
+) { /* snip */ }
 ```
 
 arguments:
-- `streamReader`: a stream reader that carries data (as Quad[]) and metadata (also Quad[]).
-- `metaCollection`: the name of the used metadata collection of the mongo database. Used for storing all metadata.
-- `dataCollection`: the name of the used data collection of the mongo database. Used for storing the actual member data.
-- `indexCollection`: the name of the used index collection of the mongo database. Used for storing all information about the available fragmentations.
-- `mongoUrl`: optional parameter to specify the mongo connection url. When undefined, the evn parameter `DB_CONN_STRING` is used. Default value is `mongodb://localhost:27017/ldes`;
 
-### But what is a Stream?
-
-If you are not familiar with the connector architecture, this example can get you started. (setting up a pipeline with an orchestrator like [nautirust](https://github.com/ajuvercr/nautirust) and using the [js-runner](https://github.com/ajuvercr/js-runner))
-
-```typescript
-import { SimpleStream, Stream } from "@treecg/connector-types";
-import type * as RDF from '@rdfjs/types';
-import { ingest } from ".";
-
-type SR<T> = {
-    [P in keyof T]: Stream<T[P]>;
-}
-
-type Data = {
-    data: RDF.Quad[],
-    metadata: RDF.Quad[],
-}
-
-async function main() {
-    const dataStream = new SimpleStream<RDF.Quad[]>();
-    const metadataStream = new SimpleStream<RDF.Quad[]>();
-    const streamReader: SR<Data> = {data: dataStream, metadata: metadataStream};
-
-    await ingest(streamReader, "meta", "data", "index", "https://w3id.org/ldes#TimestampFragmentation", "mongodb://localhost:27017/ldes");
-
-    // Push some quads
-    dataStream.push([
-
-    ]);
-}
-```
-
+- `data`: a stream reader that carries data (as `string` or `Quad[]`).
+- `metadata`: a stream reader that carries SDS metadata (as `string` or `Quad[]`).
+- `database`: connection parameters for a reachable MongoDB instance.
+- `maxsize`: max number of members per fragment.
+- `k`: max number of child nodes in the default time-based B+ Tree fragmentation.
 
 ## Authors and License
 
 Arthur Vercruysse <arthur.vercruysse@ugent.be>
+Julián Rojas <julianandres.rojasmelendez@ugent.be>
 
 © Ghent University - IMEC. MIT licensed

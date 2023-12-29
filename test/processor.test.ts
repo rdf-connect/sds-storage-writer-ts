@@ -24,7 +24,7 @@ async function checkProc(location: string, func: string) {
 
 test("ingest configuration", async () => {
   const value = `${prefixes}
-<> owl:imports <./node_modules/@ajuvercr/js-runner/ontology.ttl>, <./step.ttl>.
+<> owl:imports <./node_modules/@ajuvercr/js-runner/ontology.ttl>, <./processor.ttl>.
 
 [ ] a :Channel;
   :reader <jr>;
@@ -41,7 +41,8 @@ test("ingest configuration", async () => {
     js:data "data";
     js:index "index";
   ];
-  js:pageSize 500.
+  js:pageSize 500;
+  js:branchSize 3.
 `;
   const baseIRI = process.cwd() + "/config.ttl";
   console.log(baseIRI);
@@ -60,9 +61,9 @@ test("ingest configuration", async () => {
 
   const argss = extractSteps(proc, quads, config);
   expect(argss.length).toBe(1);
-  expect(argss[0].length).toBe(4);
+  expect(argss[0].length).toBe(5);
 
-  const [[i, mi, db, pageSize]] = argss;
+  const [[i, mi, db, pageSize, branchSize]] = argss;
   testReader(i);
   testReader(mi);
   expect(db).toBeDefined();
@@ -71,6 +72,7 @@ test("ingest configuration", async () => {
   expect(db.metadata).toBe("meta");
   expect(db.data).toBe("data");
   expect(pageSize).toBe(500);
+  expect(branchSize).toBe(3);
 
   await checkProc(proc.file, proc.func);
 });
