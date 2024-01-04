@@ -118,10 +118,10 @@ function createNewYearFragment(
    memberId: string,
    year: number): TREEFragment {
    const timeStamp = new Date();
-   timeStamp.setFullYear(year);
-   timeStamp.setMonth(0);
-   timeStamp.setDate(1);
-   timeStamp.setHours(0, 0, 0, 0);
+   timeStamp.setUTCFullYear(year);
+   timeStamp.setUTCMonth(0);
+   timeStamp.setUTCDate(1);
+   timeStamp.setUTCHours(0, 0, 0, 0);
 
    return {
       streamId,
