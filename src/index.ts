@@ -270,7 +270,7 @@ function gatherRecords(
 
 // This could be a memory problem in the long run
 // TODO: Find a way to persist written records efficiently
-const addedMembers: Set<string> = new Set();
+//const addedMembers: Set<string> = new Set();
 async function addDataRecord(
    updateRecords: DataRecord[],
    record: SDSRecord,
@@ -280,8 +280,8 @@ async function addDataRecord(
    const value = record.payload.value;
 
    // Check if record has been registered in the local memory
-   if (addedMembers.has(value)) return;
-   addedMembers.add(value);
+   //if (addedMembers.has(value)) return;
+   //addedMembers.add(value);
 
    // Check if record is already written in the collection
    const present = (await collection.countDocuments({ id: value })) > 0;
