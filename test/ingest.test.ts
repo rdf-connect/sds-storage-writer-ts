@@ -98,7 +98,7 @@ describe("Functional tests for the ingest function", () => {
             await metaColl.drop();
         }
         if (dataColl) {
-            //await dataColl.drop();
+            await dataColl.drop();
         }
         if (indexColl) {
             await indexColl.drop();
@@ -141,8 +141,8 @@ describe("Functional tests for the ingest function", () => {
         // Push metadata in
         await metadataStream.push(METADATA);
 
-        // Push some SDS records in
-        for (const record of dataGenerator(n)) {
+        // Push some SDS records in with 1h delta between each other
+        for (const record of dataGenerator(n, 1 * 60 * 60 * 1000)) {
             await dataStream.push(record);
         }
 
@@ -209,7 +209,7 @@ describe("Functional tests for the ingest function", () => {
         // Number of sub-fragments per level in the default B+Tree structure 
         const k = 3;
         // Total number of members to be pushed
-        const n = 1000
+        const n = 1000;
 
         // Execute ingest function
         await ingest(dataStream, metadataStream, config, m, k);
@@ -217,8 +217,8 @@ describe("Functional tests for the ingest function", () => {
         // Push metadata in
         await metadataStream.push(METADATA);
 
-        // Push some SDS records in
-        for (const record of dataGenerator(n)) {
+        // Push some SDS records in with 1h delta between each other
+        for (const record of dataGenerator(n, 1 * 60 * 60 * 1000)) {
             await dataStream.push(record);
         }
 
@@ -269,9 +269,91 @@ describe("Functional tests for the ingest function", () => {
             }
         }
     });
+
+    test("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 4, m = 10, n = 100) and high temporal density", async () => {
+        const dataStream = new SimpleStream<string>();
+        const metadataStream = new SimpleStream<string>();
+        const config: DBConfig = {
+            url: mongod.getUri(),
+            metadata: "METADATA",
+            data: "DATA",
+            index: "INDEX"
+        };
+
+        // Max number of members allowed per fragment
+        const m = 10;
+        // Number of sub-fragments per level in the default B+Tree structure 
+        const k = 4;
+        // Total number of members to be pushed
+        const n = 100
+
+        // Execute ingest function
+        await ingest(dataStream, metadataStream, config, m, k);
+
+        // Push metadata in
+        await metadataStream.push(METADATA);
+
+        // Push some SDS records in with 10ms delta between each other
+        for (const record of dataGenerator(n, 10)) {
+            await dataStream.push(record);
+        }
+
+        // Check that metadata was stored
+        expect(await metaColl.countDocuments()).toBe(2);
+        expect((await metaColl.findOne({ "id": "http://example.org/ns#rmlStream" }))!.type).toBe(SDS.Stream);
+        expect((await metaColl.findOne({ "id": "http://example.org/ns#sdsStream" }))!.type).toBe(SDS.Stream);
+        // Check all data records were persisted
+        expect(await dataColl.countDocuments()).toBe(n);
+        // Check that all fragments are correct and consistent
+        const indexes = await indexColl.find().toArray();
+
+        for (const bucket of indexes) {
+            // Check fragment does not violate max members constraint
+            expect(bucket.members!.length).toBeLessThanOrEqual(m);
+            // Check local members do belong here
+            for (const memId of bucket.members!) {
+                const member = await dataColl.findOne({ "id": memId });
+                expect(member).toBeDefined();
+                expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(bucket.timeStamp!.getTime());
+                expect(member!.timestamp.getTime()).toBeLessThan(bucket.timeStamp!.getTime() + bucket.span);
+            }
+            // Check it contains at most 2k relations (tree:LessThan & tree:GreaterThanOrEqualTo)
+            expect(bucket.relations.length).toBeLessThanOrEqual(2 * k);
+            // Check that all relations are telling the truth
+            for (const rel of bucket.relations) {
+                // Fetch related bucket
+                const relBucket = (await indexColl.find({ id: rel.bucket }).toArray())[0];
+                expect(relBucket).toBeDefined();
+
+                if (rel.type === RelationType.GreaterThanOrEqualTo) {
+                    expect(rel.timestampRelation).toBeTruthy();
+                    expect(new Date(rel.value!).getTime()).toBe(relBucket.timeStamp!.getTime());
+                    for (const memRef of relBucket.members!) {
+                        const member = await dataColl.findOne({ "id": memRef });
+                        expect(member).toBeDefined();
+                        expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(rel.value!).getTime());
+                    }
+                } else if (rel.type === RelationType.LessThan) {
+                    expect(rel.timestampRelation).toBeTruthy();
+                    expect(new Date(rel.value!).getTime())
+                        .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
+                    for (const memRef of relBucket.members!) {
+                        const member = await dataColl.findOne({ "id": memRef });
+                        expect(member).toBeDefined();
+                        expect(member!.timestamp.getTime()).toBeLessThan(new Date(rel.value!).getTime());
+                    }
+                } else if (rel.type === RelationType.Relation) {
+                    // Check that related bucket increased pagination by 1
+                    expect(relBucket.page).toBe(bucket.page + 1);
+                    // Timestamps should be equal
+                    expect(relBucket.timeStamp!.getTime()).toBe(bucket.timeStamp!.getTime());
+                }
+            }
+        }
+    });
 });
 
-function* dataGenerator(n: number): Generator<string> {
+function* dataGenerator(n: number, inc: number): Generator<string> {
     const date = new Date();
 
     for (let i = 0; i < n; i++) {
@@ -294,7 +376,7 @@ function* dataGenerator(n: number): Generator<string> {
                 ex:prop3 ex:SomeNamedNode.
         `;
         // Increase timestamp by 1h
-        date.setTime(date.getTime() + (1 * 60 * 60 * 1000));
+        date.setTime(date.getTime() + inc);
         yield record;
     }
 }

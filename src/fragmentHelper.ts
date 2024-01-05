@@ -21,7 +21,8 @@ export type TREEFragment = {
    timeStamp?: Date,
    span: number,
    immutable: boolean,
-   root: boolean
+   root: boolean,
+   page: number
 };
 
 export type ExtractIndices = (member: Member, mongo: Collection<TREEFragment>, timestampPath?: RDF.Term) => Promise<void>;
@@ -45,16 +46,17 @@ export async function handleTimestampPath(
    k: number = 4,
    logger: Logger
 ) {
+   logger.debug("-----------------------------------------------------------------------------------");
    logger.debug(`[ingest] handleTimeStamp: Processing record ${memberId} with timestamp ${timestampValue.toISOString()}`);
 
    // Candidate fragment where we want to put this member (most granular fragment)
    const candidateFragment: undefined | TREEFragment = (
       await indexColl.find({ streamId, timeStamp: { "$lte": timestampValue } })
-         .sort({ timeStamp: -1, span: -1 }).limit(1).toArray()
+         .sort({ timeStamp: -1, span: -1, page: -1 }).limit(1).toArray()
    )[0];
 
    if (candidateFragment) {
-      logger.debug(`[ingest] handleTimeStamp: Found this closest candidate fragment: ${candidateFragment.timeStamp?.toISOString()}`);
+      logger.debug(`[ingest] handleTimeStamp: Found this closest candidate fragment: ${candidateFragment.timeStamp?.toISOString()} (page ${candidateFragment.page})`);
 
       // Check if this member belongs to a new top level fragment (i.e. a new year)
       if (timestampValue.getFullYear() > candidateFragment.timeStamp!.getFullYear()) {
@@ -125,14 +127,15 @@ function createNewYearFragment(
 
    return {
       streamId,
-      id: id ? id : `${streamId}/${timeStamp.toISOString()}/31536000000`,
+      id: id ? id : `${streamId}/${timeStamp.toISOString()}/31536000000/0`,
       timeStamp,
       relations: [],
       members: [memberId],
       count: 1,
       span: 31536000000,
       immutable: false,
-      root: true
+      root: true,
+      page: 0
    }
 }
 
@@ -147,6 +150,8 @@ async function splitFragmentRecursively(
    indexColl: Collection<TREEFragment>,
    logger: Logger
 ) {
+   // Time span for new sub-fragment(s)
+   const newSpan = candidateFragment.span / k;
    // Gather all the members of the full fragment
    const membersRefs = candidateFragment.members!;
    if (newMember) {
@@ -156,97 +161,149 @@ async function splitFragmentRecursively(
    const members = await memberColl.find({ id: { $in: membersRefs } }).toArray();
    // Sort members per timestamp
    members.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-   // Timespan for new sub-fragments
-   const newSpan = candidateFragment.span / k;
-   // New relations to be added
-   const newRelations: TREEFragment["relations"] = []
-   // New sub-fragments
-   const subFragments: TREEFragment[] = [];
 
-   for (let i = 0; i < k; i++) {
-      const newTs = new Date(candidateFragment.timeStamp!.getTime() + (i * newSpan));
-      const subFragment: TREEFragment = {
-         id: `${streamId}/${newTs.toISOString()}/${newSpan}`,
+   if (newSpan < 60000) {
+      // We don't want to split temporal fragments under a resolution of 1 minute.
+      // Instead we opt for a 1-dimensional pagination when the amount of members
+      // is too high for a very short time span.
+
+      const baseBucketId = `${streamId}/${candidateFragment.timeStamp!.toISOString()}/${candidateFragment.span}`;
+
+      const newFragment: TREEFragment = {
+         id: `${baseBucketId}/${candidateFragment.page + 1}`,
          streamId,
          relations: [],
-         members: [],
-         count: 0,
-         timeStamp: newTs,
-         span: newSpan,
+         members: members.slice(maxSize).map(m => m.id),
+         count: members.slice(maxSize).map(m => m.id).length,
+         timeStamp: candidateFragment.timeStamp!,
+         span: candidateFragment.span,
          immutable: false,
-         root: false
+         root: false,
+         page: candidateFragment.page + 1
       };
 
-      for (const member of members) {
-         // Check which members belong in this new sub-fragment
-         if (member.timestamp.getTime() >= newTs.getTime()
-            && member.timestamp.getTime() < (newTs.getTime() + newSpan)) {
-            subFragment.members?.push(member.id);
-            subFragment.count++;
+      const newRelation = {
+         type: RelationType.Relation,
+         bucket: `${baseBucketId}/${candidateFragment.page + 1}`,
+         timestampRelation: false
+      };
 
-         }
-      }
-
-      // These are the new relations that are added from the originally full
-      // candidate fragment towards this new sub-fragment
-      newRelations.push(...[
-         {
-            type: RelationType.GreaterThanOrEqualTo,
-            value: newTs.toISOString(),
-            bucket: subFragment.id!,
-            path,
-            timestampRelation: true
-         },
-         {
-            type: RelationType.LessThan,
-            value: new Date(newTs.getTime() + newSpan).toISOString(),
-            bucket: subFragment.id!,
-            path,
-            timestampRelation: true
-         }
-      ]);
-
-      // Check we if this new sub-fragment is violating the max size constraint
-      if (subFragment.members!.length > maxSize) {
-         // Further split this fragment that is currently too large
-         logger.debug(`SPLITTING ONE LEVEL DEEPER for sub-fragment ${subFragment.timeStamp?.toISOString()}`);
-         await splitFragmentRecursively(
-            k,
-            maxSize,
-            subFragment,
-            null,
-            streamId,
-            path,
-            memberColl,
-            indexColl,
-            logger
-         );
-      } else {
-         // Sub-fragment to be persisted in a bulk operation
-         subFragments.push(subFragment);
-      }
-   }
-
-   // Persist new sub-fragments and their relations
-   await Promise.all([
-      indexColl.insertMany(subFragments),
-      indexColl.updateOne(
-         { id: candidateFragment.id! },
-         {
-            $set: {
-               streamId,
-               members: [], 
-               count: 0, 
-               timeStamp: candidateFragment.timeStamp,
-               span: candidateFragment.span,
-               immutable: candidateFragment.immutable,
-               root: candidateFragment.root
+      // Persist new paginated fragment and its relation
+      await Promise.all([
+         indexColl.insertOne(newFragment),
+         indexColl.updateOne(
+            { id: candidateFragment.id! },
+            {
+               $set: {
+                  streamId,
+                  members: members.slice(0, maxSize).map(m => m.id),
+                  count: maxSize,
+                  relations: [newRelation],
+                  timeStamp: candidateFragment.timeStamp,
+                  span: candidateFragment.span,
+                  immutable: candidateFragment.immutable,
+                  root: candidateFragment.root,
+                  page: candidateFragment.page
+               }
             },
-            $push: { relations: { $each: newRelations } }
-         },
-         { upsert: true }
-      )
-   ]);
-   logger.debug(`Added ${subFragments.length} new sub-fragments`);
+            { upsert: true }
+         )
+      ]);
+      logger.debug(`Added paginated (page ${newFragment.page}) new sub-fragment ${newFragment.timeStamp?.toISOString()}`);
+
+   } else {
+      // New relations to be added
+      const newRelations: TREEFragment["relations"] = []
+      // New sub-fragments
+      const subFragments: TREEFragment[] = [];
+
+      for (let i = 0; i < k; i++) {
+         const newTs = new Date(candidateFragment.timeStamp!.getTime() + (i * newSpan));
+         const subFragment: TREEFragment = {
+            id: `${streamId}/${newTs.toISOString()}/${newSpan}/0`,
+            streamId,
+            relations: [],
+            members: [],
+            count: 0,
+            timeStamp: newTs,
+            span: newSpan,
+            immutable: false,
+            root: false,
+            page: 0
+         };
+
+         for (const member of members) {
+            // Check which members belong in this new sub-fragment
+            if (member.timestamp.getTime() >= newTs.getTime()
+               && member.timestamp.getTime() < (newTs.getTime() + newSpan)) {
+               subFragment.members?.push(member.id);
+               subFragment.count++;
+
+            }
+         }
+
+         // These are the new relations that are added from the originally full
+         // candidate fragment towards this new sub-fragment
+         newRelations.push(...[
+            {
+               type: RelationType.GreaterThanOrEqualTo,
+               value: newTs.toISOString(),
+               bucket: subFragment.id!,
+               path,
+               timestampRelation: true
+            },
+            {
+               type: RelationType.LessThan,
+               value: new Date(newTs.getTime() + newSpan).toISOString(),
+               bucket: subFragment.id!,
+               path,
+               timestampRelation: true
+            }
+         ]);
+
+         // Check we if this new sub-fragment is violating the max size constraint
+         if (subFragment.members!.length > maxSize) {
+            // Further split this fragment that is currently too large
+            logger.debug(`Splitting one level deeper for sub-fragment ${subFragment.timeStamp?.toISOString()}`);
+            await splitFragmentRecursively(
+               k,
+               maxSize,
+               subFragment,
+               null,
+               streamId,
+               path,
+               memberColl,
+               indexColl,
+               logger
+            );
+         } else {
+            // Sub-fragment to be persisted in a bulk operation
+            subFragments.push(subFragment);
+         }
+      }
+
+      // Persist new sub-fragments and their relations
+      await Promise.all([
+         indexColl.insertMany(subFragments),
+         indexColl.updateOne(
+            { id: candidateFragment.id! },
+            {
+               $set: {
+                  streamId,
+                  members: [],
+                  count: 0,
+                  timeStamp: candidateFragment.timeStamp,
+                  span: candidateFragment.span,
+                  immutable: candidateFragment.immutable,
+                  root: candidateFragment.root,
+                  page: candidateFragment.page
+               },
+               $push: { relations: { $each: newRelations } }
+            },
+            { upsert: true }
+         )
+      ]);
+      logger.debug(`Added ${subFragments.length} new sub-fragments`);
+   }
 }
 
