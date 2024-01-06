@@ -162,8 +162,8 @@ async function splitFragmentRecursively(
    // Sort members per timestamp
    members.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-   if (newSpan < 60000) {
-      // We don't want to split temporal fragments under a resolution of 1 minute.
+   if (newSpan < 60000 * 10) {
+      // We don't want to split temporal fragments under a resolution of 10 minutes.
       // Instead we opt for a 1-dimensional pagination when the amount of members
       // is too high for a very short time span.
 
