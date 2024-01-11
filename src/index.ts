@@ -428,7 +428,8 @@ export async function ingest(
    metadata: Stream<string | RDF.Quad[]>,
    database: DBConfig,
    maxSize: number = 100,
-   k: number = 4
+   k: number = 4,
+   minBucketSpan: number = 300
 ) {
    const url = database.url || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
    const mongo = await new MongoClient(url).connect();
@@ -500,6 +501,7 @@ export async function ingest(
             memberCollection,
             maxSize,
             k,
+            minBucketSpan,
             logger
          );
       } else {
@@ -514,6 +516,7 @@ export async function ingest(
                memberCollection,
                maxSize,
                k,
+               minBucketSpan,
                logger
             );
          }

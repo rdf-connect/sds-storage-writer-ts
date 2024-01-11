@@ -44,6 +44,7 @@ export async function handleTimestampPath(
    memberColl: Collection<DataRecord>,
    maxSize: number,
    k: number = 4,
+   minBucketSpan: number,
    logger: Logger
 ) {
    logger.debug("-----------------------------------------------------------------------------------");
@@ -91,6 +92,7 @@ export async function handleTimestampPath(
                path,
                memberColl,
                indexColl,
+               minBucketSpan,
                logger
             );
          }
@@ -148,6 +150,7 @@ async function splitFragmentRecursively(
    path: string,
    memberColl: Collection<DataRecord>,
    indexColl: Collection<TREEFragment>,
+   minBucketSpan: number,
    logger: Logger
 ) {
    // Time span for new sub-fragment(s)
@@ -162,8 +165,8 @@ async function splitFragmentRecursively(
    // Sort members per timestamp
    members.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-   if (newSpan < 60000 * 10) {
-      // We don't want to split temporal fragments under a resolution of 10 minutes.
+   if (newSpan < minBucketSpan * 1000) {
+      // We don't want to split temporal fragments under a given time resolution.
       // Instead we opt for a 1-dimensional pagination when the amount of members
       // is too high for a very short time span.
 
@@ -274,6 +277,7 @@ async function splitFragmentRecursively(
                path,
                memberColl,
                indexColl,
+               minBucketSpan,
                logger
             );
          } else {
