@@ -98,7 +98,7 @@ export async function handleTimestampPath(
          }
       } else {
          // TODO: implement optional strict mode that fails in this case
-         logger.warn(`[ingest] handleTimeStamp: Received out of order member that cannot be added to the collection: ${memberId}`);
+         logger.warn(`[ingest] handleTimeStamp: Received out of order member (${memberId}) or current bucket has already expired (${candidateFragment.id})`);
          return;
       }
    } else {
@@ -129,7 +129,7 @@ function createNewYearFragment(
 
    return {
       streamId,
-      id: id ? id : `${streamId}/${timeStamp.toISOString()}/31536000000/0`,
+      id: id ? id : `${timeStamp.toISOString()}/31536000000/0`,
       timeStamp,
       relations: [],
       members: [memberId],
@@ -170,7 +170,7 @@ async function splitFragmentRecursively(
       // Instead we opt for a 1-dimensional pagination when the amount of members
       // is too high for a very short time span.
 
-      const baseBucketId = `${streamId}/${candidateFragment.timeStamp!.toISOString()}/${candidateFragment.span}`;
+      const baseBucketId = `${candidateFragment.timeStamp!.toISOString()}/${candidateFragment.span}`;
 
       const newFragment: TREEFragment = {
          id: `${baseBucketId}/${candidateFragment.page + 1}`,
@@ -223,7 +223,7 @@ async function splitFragmentRecursively(
       for (let i = 0; i < k; i++) {
          const newTs = new Date(candidateFragment.timeStamp!.getTime() + (i * newSpan));
          const subFragment: TREEFragment = {
-            id: `${streamId}/${newTs.toISOString()}/${newSpan}/0`,
+            id: `${newTs.toISOString()}/${newSpan}/0`,
             streamId,
             relations: [],
             members: [],
