@@ -442,6 +442,7 @@ export async function ingest(
    let ingestMetadata = true;
    let ingestData = true;
    let closed = false;
+   let lastMemberTimestamp = null;
 
    const closeMongo = () => {
       if (!ingestMetadata && !ingestData && !closed) {
@@ -547,25 +548,31 @@ export async function ingest(
          logger.debug(`[ingest] Inserted ${updateData.length} new members to the data collection`);
       }
 
+      // Update INDEX collection accordingly
+      for (const r of records) {
+         await (r.timestampValue ? pushTimstampMemberToDB(r) : pushMemberToDB(r));
+      }
+
       const isDefaultTimestamp = records[0].timestampValue !== undefined;
 
       // If the fragmentation strategy is the default timestamp-based
       // we need to handle the labeling of buckets/fragments as immutable
       // based on the current time
       if (isDefaultTimestamp) {
-         const now = new Date();
+         // Last known member timestamp
+         lastMemberTimestamp = new Date(records[records.length -1].timestampValue!)
          // Gather all mutable fragments that have expired
 
          // TODO: Check if we can directly update all expired fragments
          // Not sure how to add the timestamp and the span while querying
          const expiredBuckets = await indexCollection.find({
-            timeStamp: { $lte: now },
+            timeStamp: { $lte: lastMemberTimestamp },
             immutable: false
          }).toArray();
 
          for (const buck of expiredBuckets) {
             const expDate = buck.timeStamp!.getTime() + buck.span;
-            if (expDate <= now.getTime()) {
+            if (expDate < lastMemberTimestamp.getTime()) {
                logger.debug(`Labeling bucket ${buck.timeStamp?.toISOString()} as immutable`);
                // Label these buckets as immutable
                await indexCollection.updateOne(buck, {
@@ -573,11 +580,6 @@ export async function ingest(
                });
             }
          }
-      }
-
-      // Update INDEX collection accordingly
-      for (const r of records) {
-         await (r.timestampValue ? pushTimstampMemberToDB(r) : pushMemberToDB(r));
       }
 
       // This next steps are only performed if the fragmentation strategy
