@@ -108,8 +108,8 @@ export async function handleTimestampPath(
          // TODO: implement optional strict mode that fails in this case
          logger.warn(`[ingest] handleTimeStamp: Received out of order member that cannot be added to the collection: ${memberId}`);
       } else {
-         // This is the first fragment ever. Let's create a fragment spanning 1 year
-         const currYear = new Date().getFullYear();
+         // This is the first fragment ever. Let's create a fragment spanning 1 year based on the member's timestamp
+         const currYear = timestampValue.getFullYear();
          await indexColl.insertOne(createNewYearFragment(streamId, id, memberId, currYear));
          logger.debug(`[ingest] handleTimeStamp: Created initial fragment spanning 1 year: ${currYear}`);
       }
@@ -267,7 +267,7 @@ async function splitFragmentRecursively(
          // Check we if this new sub-fragment is violating the max size constraint
          if (subFragment.members!.length > maxSize) {
             // Further split this fragment that is currently too large
-            logger.debug(`Splitting one level deeper for sub-fragment ${subFragment.timeStamp?.toISOString()}`);
+            logger.debug(`Splitting one level deeper for sub-fragment ${subFragment.timeStamp?.toISOString()} (span: ${subFragment.span})`);
             await splitFragmentRecursively(
                k,
                maxSize,
@@ -307,7 +307,7 @@ async function splitFragmentRecursively(
             { upsert: true }
          )
       ]);
-      logger.debug(`Added ${subFragments.length} new sub-fragments`);
+      logger.debug(`Added ${subFragments.length} new sub-fragments (${subFragments.map(sf => ` ${sf.id}`)})`);
    }
 }
 

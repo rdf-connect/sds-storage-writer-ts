@@ -573,7 +573,7 @@ export async function ingest(
          for (const buck of expiredBuckets) {
             const expDate = buck.timeStamp!.getTime() + buck.span;
             if (expDate < lastMemberTimestamp.getTime()) {
-               logger.debug(`Labeling bucket ${buck.timeStamp?.toISOString()} as immutable`);
+               logger.debug(`Labeling bucket ${buck.timeStamp?.toISOString()} (span: ${buck.span}) as immutable`);
                // Label these buckets as immutable
                await indexCollection.updateOne(buck, {
                   $set: { immutable: true }
