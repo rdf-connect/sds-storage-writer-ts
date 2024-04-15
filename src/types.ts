@@ -37,16 +37,8 @@ export type Relation = {
   from: string;
   bucket: string;
   type: RelationType;
-
-  value?: {
-    value: string;
-    termType: string;
-  };
-  path?: {
-    value: string;
-    termType: string;
-  };
-  quads?: string;
+  value?: string;
+  path?: string;
 };
 
 export type DBConfig = {

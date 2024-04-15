@@ -9,6 +9,9 @@ import {
   SDSRecord,
   TREEFragment,
 } from "./types";
+import { serializeRdfThing } from "./utils";
+import { Literal, NamedNode } from "n3";
+import { createRequire } from "module";
 
 type Fragment = TREEFragment & FragmentExtension;
 
@@ -324,39 +327,27 @@ async function handleSubfragmentCreation(
       }
     }
 
+    const createRelation = (type: RelationType, time: Date) => {
+      return {
+        from: candidateFragment.id,
+        bucket: subFragment.id!,
+        type,
+        value: serializeRdfThing({
+          id: new Literal(time.toISOString()),
+          quads: [],
+        }),
+        path: serializeRdfThing({ id: new NamedNode(path), quads: [] }),
+      };
+    };
+
     // These are the new relations that are added from the originally full
     // candidate fragment towards this new sub-fragment
     newRelations.push(
-      ...[
-        {
-          from: candidateFragment.id,
-          bucket: subFragment.id!,
-          type: RelationType.GreaterThanOrEqualTo,
-          value: {
-            value: newTs.toISOString(),
-            termType: "Literal",
-          },
-          path: {
-            value: path,
-            termType: "NamedNode",
-          },
-          // timestampRelation: true,
-        },
-        {
-          from: candidateFragment.id,
-          bucket: subFragment.id!,
-          type: RelationType.LessThan,
-          value: {
-            value: new Date(newTs.getTime() + newSpan).toISOString(),
-            termType: "Literal",
-          },
-          path: {
-            value: path,
-            termType: "NamedNode",
-          },
-          // timestampRelation: true,
-        },
-      ],
+      createRelation(RelationType.GreaterThanOrEqualTo, newTs),
+      createRelation(
+        RelationType.LessThan,
+        new Date(newTs.getTime() + newSpan),
+      ),
     );
 
     // Check we if this new sub-fragment is violating the max size constraint

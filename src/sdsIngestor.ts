@@ -3,6 +3,7 @@ import { Parser, Writer } from "n3";
 import { CBDShapeExtractor, Extractor } from "sds-processors";
 import { RelationType } from "@treecg/types";
 import { DataRecord, Relation, TREEFragment } from "./types";
+import { serializeRdfThing } from "./utils";
 
 export type MongoCollections = {
   member: Collection<DataRecord>;
@@ -80,22 +81,10 @@ export async function handleBucketData(input: string, db: MongoCollections) {
           (x) => x.target.value == bucket!.id.value,
         )!;
 
-        const quads = rel.path
-          ? new Writer().quadsToString(rel.path.quads)
-          : undefined;
-
-        const path = rel.path
-          ? {
-              value: rel.path.id.value,
-              termType: rel.path.id.termType,
-            }
-          : undefined;
+        const path = rel.path ? serializeRdfThing(rel.path) : undefined;
 
         const value = rel.value
-          ? {
-              value: rel.value.value,
-              termType: rel.value.termType,
-            }
+          ? serializeRdfThing({ id: rel.value, quads: [] })
           : undefined;
 
         await db.relations.updateOne(
@@ -110,7 +99,6 @@ export async function handleBucketData(input: string, db: MongoCollections) {
               type: <RelationType>rel.type.value,
               value,
               path,
-              quads,
             },
           },
           { upsert: true },

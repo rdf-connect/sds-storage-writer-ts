@@ -2,7 +2,8 @@ import { Stream } from "@ajuvercr/js-runner";
 import type * as RDF from "@rdfjs/types";
 import { LDES, Member, PROV, RDF as RDFT, SDS } from "@treecg/types";
 import { Collection } from "mongodb";
-import { Parser, Store, Writer } from "n3";
+import { Parser, Quad_Object, Store, Writer } from "n3";
+import { DataFactory } from "rdf-data-factory";
 import winston from "winston";
 
 const consoleTransport = new winston.transports.Console();
@@ -15,6 +16,28 @@ export const logger = winston.createLogger({
   ),
   transports: [consoleTransport],
 });
+
+const df = new DataFactory();
+
+export function serializeRdfThing(thing: {
+  id: RDF.Term;
+  quads: RDF.Quad[];
+}): string {
+  const quads = [];
+  quads.push(
+    df.quad(
+      df.namedNode(""),
+      df.namedNode("http://purl.org/dc/terms/subject"),
+      <Quad_Object>thing.id,
+    ),
+  );
+  quads.push(...thing.quads);
+
+  const filtered = quads.filter(
+    (x, i, xs) => xs.findIndex((p) => p.equals(x)) == i,
+  );
+  return new Writer().quadsToString(filtered);
+}
 
 export type DenyQuad = (q: RDF.Quad, currentId: RDF.Term) => boolean;
 // Set<String> yikes!
