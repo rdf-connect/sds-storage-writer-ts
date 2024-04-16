@@ -15,12 +15,12 @@ export type TREEFragment = {
   root: boolean;
   immutable: boolean;
   streamId: string;
-  members?: string[];
+  members: string[];
 };
 
 export type FragmentExtension = {
   count: number;
-  timeStamp?: Date;
+  timeStamp: Date;
   span: number;
   page: number;
 };

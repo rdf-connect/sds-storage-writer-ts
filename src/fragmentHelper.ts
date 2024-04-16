@@ -10,8 +10,10 @@ import {
   TREEFragment,
 } from "./types";
 import { serializeRdfThing } from "./utils";
-import { Literal, NamedNode } from "n3";
-import { createRequire } from "module";
+import { NamedNode } from "n3";
+import { DataFactory } from "rdf-data-factory";
+
+const df = new DataFactory();
 
 type Fragment = TREEFragment & FragmentExtension;
 
@@ -161,13 +163,16 @@ function createNewYearFragment(
   timeStamp.setUTCDate(1);
   timeStamp.setUTCHours(0, 0, 0, 0);
 
+  const isLeapYear = new Date(year, 1, 29).getDate() === 29;
+  const days = isLeapYear ? 366 : 365;
+
   return {
     streamId,
     id: id ? id : `${timeStamp.toISOString()}/31536000000/0`,
     timeStamp,
     members: [memberId],
     count: 1,
-    span: 31536000000,
+    span: days * 24 * 60 * 60 * 1000,
     immutable: false,
     root: true,
     page: 0,
@@ -198,46 +203,26 @@ async function splitFragmentRecursively(
   const newRelations: Relation[] = [];
   const members = await memberColl.find({ id: { $in: membersRefs } }).toArray();
   // Sort members per timestamp
-  members.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  members.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   if (newSpan < minBucketSpan * 1000) {
     // We don't want to split temporal fragments under a given time resolution.
     // Instead we opt for a 1-dimensional pagination when the amount of members
     // is too high for a very short time span.
 
-    const newFragment = handlePagedFragment(
+    await handlePagedFragment(
       candidateFragment,
       streamId,
       members,
       maxSize,
       newRelations,
+      indexColl,
+      relationColl,
       logger,
     );
-
-    // Persist new paginated fragment and its relation
-    await Promise.all([
-      relationColl.insertMany(newRelations),
-      indexColl.insertOne(newFragment),
-      indexColl.updateOne(
-        { id: candidateFragment.id! },
-        {
-          $set: {
-            streamId,
-            members: members.slice(0, maxSize).map((m) => m.id),
-            count: maxSize,
-            timeStamp: candidateFragment.timeStamp,
-            span: candidateFragment.span,
-            immutable: candidateFragment.immutable,
-            root: candidateFragment.root,
-            page: candidateFragment.page,
-          },
-        },
-        { upsert: true },
-      ),
-    ]);
   } else {
     // New sub-fragments
-    const subFragments: Fragment[] = await handleSubfragmentCreation(
+    await handleSubfragmentCreation(
       k,
       candidateFragment,
       newSpan,
@@ -251,34 +236,6 @@ async function splitFragmentRecursively(
       indexColl,
       relationColl,
       minBucketSpan,
-    );
-
-    // Persist new sub-fragments and their relations
-    await Promise.all([
-      relationColl.insertMany(newRelations),
-      indexColl.insertMany(subFragments),
-      indexColl.updateOne(
-        { id: candidateFragment.id! },
-        {
-          $set: {
-            streamId,
-            members: [],
-            count: 0,
-            timeStamp: candidateFragment.timeStamp,
-            span: candidateFragment.span,
-            immutable: candidateFragment.immutable,
-            root: candidateFragment.root,
-            page: candidateFragment.page,
-          },
-        },
-        { upsert: true },
-      ),
-    ]);
-
-    logger.debug(
-      `Added ${subFragments.length} new sub-fragments (${subFragments.map(
-        (sf) => ` ${sf.id}`,
-      )})`,
     );
   }
 }
@@ -301,9 +258,7 @@ async function handleSubfragmentCreation(
   const subFragments: Fragment[] = [];
 
   for (let i = 0; i < k; i++) {
-    const newTs = new Date(
-      candidateFragment.timeStamp!.getTime() + i * newSpan,
-    );
+    const newTs = new Date(candidateFragment.timeStamp.getTime() + i * newSpan);
     const subFragment: Fragment = {
       id: `${newTs.toISOString()}/${newSpan}/0`,
       streamId,
@@ -322,7 +277,7 @@ async function handleSubfragmentCreation(
         member.timestamp.getTime() >= newTs.getTime() &&
         member.timestamp.getTime() < newTs.getTime() + newSpan
       ) {
-        subFragment.members?.push(member.id);
+        subFragment.members.push(member.id);
         subFragment.count++;
       }
     }
@@ -333,7 +288,7 @@ async function handleSubfragmentCreation(
         bucket: subFragment.id!,
         type,
         value: serializeRdfThing({
-          id: new Literal(time.toISOString()),
+          id: df.literal(time.toISOString()),
           quads: [],
         }),
         path: serializeRdfThing({ id: new NamedNode(path), quads: [] }),
@@ -377,17 +332,44 @@ async function handleSubfragmentCreation(
     }
   }
 
-  return subFragments;
+  await Promise.all([
+    relationColl.insertMany(newRelations),
+    indexColl.insertMany(subFragments),
+    indexColl.updateOne(
+      { id: candidateFragment.id! },
+      {
+        $set: {
+          streamId,
+          members: [],
+          count: 0,
+          timeStamp: candidateFragment.timeStamp,
+          span: candidateFragment.span,
+          immutable: candidateFragment.immutable,
+          root: candidateFragment.root,
+          page: candidateFragment.page,
+        },
+      },
+      { upsert: true },
+    ),
+  ]);
+
+  logger.debug(
+    `Added ${subFragments.length} new sub-fragments (${subFragments.map(
+      (sf) => ` ${sf.id}`,
+    )})`,
+  );
 }
 
-function handlePagedFragment(
+async function handlePagedFragment(
   candidateFragment: Fragment,
   streamId: string,
   members: DataRecord[],
   maxSize: number,
   newRelations: Relation[],
+  indexColl: Collection<Fragment>,
+  relationColl: Collection<Relation>,
   logger: Logger,
-): Fragment {
+) {
   const baseBucketId = `${candidateFragment.timeStamp!.toISOString()}/${
     candidateFragment.span
   }`;
@@ -416,5 +398,25 @@ function handlePagedFragment(
     }) new sub-fragment ${newFragment.timeStamp?.toISOString()}`,
   );
 
-  return newFragment;
+  // Persist new paginated fragment and its relation
+  await Promise.all([
+    relationColl.insertMany(newRelations),
+    indexColl.insertOne(newFragment),
+    indexColl.updateOne(
+      { id: candidateFragment.id! },
+      {
+        $set: {
+          streamId,
+          members: members.slice(0, maxSize).map((m) => m.id),
+          count: maxSize,
+          timeStamp: candidateFragment.timeStamp,
+          span: candidateFragment.span,
+          immutable: candidateFragment.immutable,
+          root: candidateFragment.root,
+          page: candidateFragment.page,
+        },
+      },
+      { upsert: true },
+    ),
+  ]);
 }

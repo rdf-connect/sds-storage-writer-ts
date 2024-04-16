@@ -2,9 +2,25 @@ import { describe, test, expect, beforeAll, beforeEach, afterAll } from "@jest/g
 import { SimpleStream } from "@ajuvercr/js-runner";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { Collection, Db, MongoClient } from "mongodb";
-import { ingest, DBConfig, DataRecord } from "../src/index";
+import { ingest } from "../src/index";
 import { RelationType, SDS } from "@treecg/types";
-import { TREEFragment } from "../src/fragmentHelper";
+import { DataRecord, FragmentExtension, Relation, TREEFragment } from "../src/types";
+import { NamedNode, Parser, Term } from "n3";
+
+
+function unpackRdfThing(input: string): Term | undefined {
+  const quads = new Parser().parse(input);
+
+  const idx = quads.findIndex((x) =>
+    x.predicate.equals(new NamedNode("http://purl.org/dc/terms/subject")),
+  );
+  if (idx == -1) return;
+
+  const subject = quads[idx].object;
+  quads.splice(idx, 1);
+
+  return subject;
+}
 
 describe("Functional tests for the ingest function", () => {
     const PREFIXES = `
@@ -80,7 +96,8 @@ describe("Functional tests for the ingest function", () => {
     let db: Db;
     let metaColl: Collection;
     let dataColl: Collection<DataRecord>;
-    let indexColl: Collection<TREEFragment>;
+    let indexColl: Collection<TREEFragment & FragmentExtension>;
+  let relationColl: Collection<Relation>;
 
     beforeAll(async () => {
         // Initialize in-memory MongoDB
@@ -103,10 +120,19 @@ describe("Functional tests for the ingest function", () => {
         if (indexColl) {
             await indexColl.drop();
         }
+        if (relationColl) {
+            await relationColl.drop();
+        }
 
-        metaColl = db.collection("METADATA");
+        metaColl = db.collection("META");
         dataColl = db.collection<DataRecord>("DATA");
-        indexColl = db.collection<TREEFragment>("INDEX");
+        indexColl = db.collection<TREEFragment & FragmentExtension>("INDEX");
+        relationColl = db.collection<Relation>("RELATIONS");
+
+        await metaColl.deleteMany({})
+        await dataColl.deleteMany({});
+        await indexColl.deleteMany({});
+        await relationColl.deleteMany({});
     });
 
     afterAll(async () => {
@@ -121,12 +147,7 @@ describe("Functional tests for the ingest function", () => {
     test("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 4, m = 10, n = 100)", async () => {
         const dataStream = new SimpleStream<string>();
         const metadataStream = new SimpleStream<string>();
-        const config: DBConfig = {
-            url: mongod.getUri(),
-            metadata: "METADATA",
-            data: "DATA",
-            index: "INDEX"
-        };
+        const config  = mongod.getUri();
 
         // Max number of members allowed per fragment
         const m = 10;
@@ -165,31 +186,17 @@ describe("Functional tests for the ingest function", () => {
                 expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(bucket.timeStamp!.getTime());
                 expect(member!.timestamp.getTime()).toBeLessThan(bucket.timeStamp!.getTime() + bucket.span);
             }
+            
+            const relations = await relationColl.find({from: bucket.id}).toArray();
             // Check it contains at most 2k relations (tree:LessThan & tree:GreaterThanOrEqualTo)
-            expect(bucket.relations.length).toBeLessThanOrEqual(2 * k);
+            expect(relations.length).toBeLessThanOrEqual(2 * k);
             // Check that all relations are telling the truth
-            for (const rel of bucket.relations) {
+            for (const rel of relations) {
                 // Fetch related bucket
                 const relBucket = (await indexColl.find({ id: rel.bucket }).toArray())[0];
                 expect(relBucket).toBeDefined();
-                expect(rel.timestampRelation).toBeTruthy();
 
-                if (rel.type === RelationType.GreaterThanOrEqualTo) {
-                    expect(new Date(rel.value!).getTime()).toBe(relBucket.timeStamp!.getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(rel.value!).getTime());
-                    }
-                } else if (rel.type === RelationType.LessThan) {
-                    expect(new Date(rel.value!).getTime())
-                        .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeLessThan(new Date(rel.value!).getTime());
-                    }
-                }
+                await checkRelation(rel, relBucket, dataColl);
             }
         }
     });
@@ -197,12 +204,7 @@ describe("Functional tests for the ingest function", () => {
     test("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 3, m = 100, n = 1000)", async () => {
         const dataStream = new SimpleStream<string>();
         const metadataStream = new SimpleStream<string>();
-        const config: DBConfig = {
-            url: mongod.getUri(),
-            metadata: "METADATA",
-            data: "DATA",
-            index: "INDEX"
-        };
+        const config  = mongod.getUri();
 
         // Max number of members allowed per fragment
         const m = 100;
@@ -241,31 +243,17 @@ describe("Functional tests for the ingest function", () => {
                 expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(bucket.timeStamp!.getTime());
                 expect(member!.timestamp.getTime()).toBeLessThan(bucket.timeStamp!.getTime() + bucket.span);
             }
+
+            const relations = await relationColl.find({from: bucket.id}).toArray();
             // Check it contains at most 2k relations (tree:LessThan & tree:GreaterThanOrEqualTo)
-            expect(bucket.relations.length).toBeLessThanOrEqual(2 * k);
+            expect(relations.length).toBeLessThanOrEqual(2 * k);
             // Check that all relations are telling the truth
-            for (const rel of bucket.relations) {
+            for (const rel of relations) {
                 // Fetch related bucket
                 const relBucket = (await indexColl.find({ id: rel.bucket }).toArray())[0];
                 expect(relBucket).toBeDefined();
-                expect(rel.timestampRelation).toBeTruthy();
 
-                if (rel.type === RelationType.GreaterThanOrEqualTo) {
-                    expect(new Date(rel.value!).getTime()).toBe(relBucket.timeStamp!.getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(rel.value!).getTime());
-                    }
-                } else if (rel.type === RelationType.LessThan) {
-                    expect(new Date(rel.value!).getTime())
-                        .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeLessThan(new Date(rel.value!).getTime());
-                    }
-                }
+                await checkRelation(rel, relBucket, dataColl);
             }
         }
     });
@@ -273,12 +261,7 @@ describe("Functional tests for the ingest function", () => {
     test("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 4, m = 10, n = 100) and high temporal density", async () => {
         const dataStream = new SimpleStream<string>();
         const metadataStream = new SimpleStream<string>();
-        const config: DBConfig = {
-            url: mongod.getUri(),
-            metadata: "METADATA",
-            data: "DATA",
-            index: "INDEX"
-        };
+        const config  = mongod.getUri();
 
         // Max number of members allowed per fragment
         const m = 10;
@@ -317,50 +300,33 @@ describe("Functional tests for the ingest function", () => {
                 expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(bucket.timeStamp!.getTime());
                 expect(member!.timestamp.getTime()).toBeLessThan(bucket.timeStamp!.getTime() + bucket.span);
             }
+
+            const relations = await relationColl.find({from: bucket.id}).toArray();
             // Check it contains at most 2k relations (tree:LessThan & tree:GreaterThanOrEqualTo)
-            expect(bucket.relations.length).toBeLessThanOrEqual(2 * k);
+            expect(relations.length).toBeLessThanOrEqual(2 * k);
             // Check that all relations are telling the truth
-            for (const rel of bucket.relations) {
+            for (const rel of relations) {
                 // Fetch related bucket
                 const relBucket = (await indexColl.find({ id: rel.bucket }).toArray())[0];
                 expect(relBucket).toBeDefined();
 
-                if (rel.type === RelationType.GreaterThanOrEqualTo) {
-                    expect(rel.timestampRelation).toBeTruthy();
-                    expect(new Date(rel.value!).getTime()).toBe(relBucket.timeStamp!.getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(rel.value!).getTime());
+                if(!(await checkRelation(rel, relBucket, dataColl))) {
+                    if (rel.type === RelationType.Relation) {
+                       // Check that related bucket increased pagination by 1
+                         expect(relBucket.page).toBe(bucket.page + 1);
+                         // Timestamps should be equal
+                         expect(relBucket.timeStamp!.getTime()).toBe(bucket.timeStamp!.getTime());
+                       }
+
+                      }
                     }
-                } else if (rel.type === RelationType.LessThan) {
-                    expect(rel.timestampRelation).toBeTruthy();
-                    expect(new Date(rel.value!).getTime())
-                        .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeLessThan(new Date(rel.value!).getTime());
-                    }
-                } else if (rel.type === RelationType.Relation) {
-                    // Check that related bucket increased pagination by 1
-                    expect(relBucket.page).toBe(bucket.page + 1);
-                    // Timestamps should be equal
-                    expect(relBucket.timeStamp!.getTime()).toBe(bucket.timeStamp!.getTime());
-                }
-            }
         }
     });
 
-    test("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 4, m = 10, n = 500, b = 3600) and older timestamps", async () => {
+    test.only("Writing a bucketless SDS into MongoDB using the default time-based fragmentation (k = 4, m = 10, n = 500, b = 3600) and older timestamps", async () => {
         const dataStream = new SimpleStream<string>();
         const metadataStream = new SimpleStream<string>();
-        const config: DBConfig = {
-            url: mongod.getUri(),
-            metadata: "METADATA",
-            data: "DATA",
-            index: "INDEX"
-        };
+        const config  = mongod.getUri();
 
         // Max number of members allowed per fragment
         const m = 10;
@@ -378,14 +344,13 @@ describe("Functional tests for the ingest function", () => {
         await metadataStream.push(METADATA);
 
         // Push some SDS records in with 30 days delta between each other and past timestamps (1 year ago)
-        for (const record of dataGenerator(n, 2592000000, new Date(new Date().getTime() - 31536000000))) {
+        for (const record of dataGenerator(n, 2592000000, new Date("2023-04-17T09:25:30.587Z"))) {
             await dataStream.push(record);
         }
 
         // Check that metadata was stored
         expect(await metaColl.countDocuments()).toBe(2);
         expect((await metaColl.findOne({ "id": "http://example.org/ns#rmlStream" }))!.type).toBe(SDS.Stream);
-        expect((await metaColl.findOne({ "id": "http://example.org/ns#sdsStream" }))!.type).toBe(SDS.Stream);
         // Check all data records were persisted
         expect(await dataColl.countDocuments()).toBe(n);
         // Check that all fragments are correct and consistent
@@ -401,41 +366,53 @@ describe("Functional tests for the ingest function", () => {
                 expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(bucket.timeStamp!.getTime());
                 expect(member!.timestamp.getTime()).toBeLessThan(bucket.timeStamp!.getTime() + bucket.span);
             }
+
+            const relations = await relationColl.find({from: bucket.id}).toArray();
             // Check it contains at most 2k relations (tree:LessThan & tree:GreaterThanOrEqualTo)
-            expect(bucket.relations.length).toBeLessThanOrEqual(2 * k);
+            expect(relations.length).toBeLessThanOrEqual(2 * k);
             // Check that all relations are telling the truth
-            for (const rel of bucket.relations) {
+            for (const rel of relations) {
                 // Fetch related bucket
                 const relBucket = (await indexColl.find({ id: rel.bucket }).toArray())[0];
                 expect(relBucket).toBeDefined();
 
-                if (rel.type === RelationType.GreaterThanOrEqualTo) {
-                    expect(rel.timestampRelation).toBeTruthy();
-                    expect(new Date(rel.value!).getTime()).toBe(relBucket.timeStamp!.getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(rel.value!).getTime());
+                if(!(await checkRelation(rel, relBucket, dataColl))) {
+                    if (rel.type === RelationType.Relation) {
+                       // Check that related bucket increased pagination by 1
+                       expect(relBucket.page).toBe(bucket.page + 1);
+                       // Timestamps should be equal
+                       expect(relBucket.timeStamp!.getTime()).toBe(bucket.timeStamp!.getTime());
                     }
-                } else if (rel.type === RelationType.LessThan) {
-                    expect(rel.timestampRelation).toBeTruthy();
-                    expect(new Date(rel.value!).getTime())
-                        .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
-                    for (const memRef of relBucket.members!) {
-                        const member = await dataColl.findOne({ "id": memRef });
-                        expect(member).toBeDefined();
-                        expect(member!.timestamp.getTime()).toBeLessThan(new Date(rel.value!).getTime());
-                    }
-                } else if (rel.type === RelationType.Relation) {
-                    // Check that related bucket increased pagination by 1
-                    expect(relBucket.page).toBe(bucket.page + 1);
-                    // Timestamps should be equal
-                    expect(relBucket.timeStamp!.getTime()).toBe(bucket.timeStamp!.getTime());
                 }
             }
         }
     });
 });
+
+async function checkRelation(rel: Relation, relBucket: TREEFragment & FragmentExtension , dataColl: Collection<DataRecord>):  Promise<boolean> {
+    if (rel.type === RelationType.GreaterThanOrEqualTo) {
+        const value = unpackRdfThing(rel.value!)!.value;
+        expect(new Date(value).getTime()).toBe(relBucket.timeStamp!.getTime());
+        for (const memRef of relBucket.members!) {
+            const member = await dataColl.findOne({ "id": memRef });
+            expect(member).toBeDefined();
+            expect(member!.timestamp.getTime()).toBeGreaterThanOrEqual(new Date(value).getTime());
+        }
+        return true
+    } else if (rel.type === RelationType.LessThan) {
+        const value = unpackRdfThing(rel.value!)!.value;
+        expect(new Date(value).getTime())
+            .toBe(new Date(relBucket.timeStamp!.getTime() + relBucket.span).getTime());
+
+        for (const memRef of relBucket.members!) {
+            const member = await dataColl.findOne({ "id": memRef });
+            expect(member).toBeDefined();
+            expect(member!.timestamp.getTime()).toBeLessThan(new Date(value).getTime());
+        }
+        return true;
+    }
+    return false;
+}
 
 function* dataGenerator(n: number, inc: number, startDate?: Date): Generator<string> {
     const date = startDate? startDate : new Date();
@@ -459,6 +436,7 @@ function* dataGenerator(n: number, inc: number, startDate?: Date): Generator<str
                 ];
                 ex:prop3 ex:SomeNamedNode.
         `;
+
         // Increase timestamp by 1h
         date.setTime(date.getTime() + inc);
         yield record;

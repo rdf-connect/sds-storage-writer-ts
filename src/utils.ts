@@ -7,7 +7,7 @@ import { DataFactory } from "rdf-data-factory";
 import winston from "winston";
 
 const consoleTransport = new winston.transports.Console();
-consoleTransport.level = process.env.LOG_LEVEL || "debug";
+consoleTransport.level = process.env.LOG_LEVEL || "info";
 
 export const logger = winston.createLogger({
   format: winston.format.combine(
@@ -36,6 +36,7 @@ export function serializeRdfThing(thing: {
   const filtered = quads.filter(
     (x, i, xs) => xs.findIndex((p) => p.equals(x)) == i,
   );
+
   return new Writer().quadsToString(filtered);
 }
 

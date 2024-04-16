@@ -69,17 +69,19 @@ function gatherRecords(
 
 // This could be a memory problem in the long run
 // TODO: Find a way to persist written records efficiently
-const addedMembers: Set<string> = new Set();
 async function addDataRecord(
   updateRecords: DataRecord[],
   record: SDSRecord<true>,
   quads: RDF.Quad[],
   collection: Collection<DataRecord>,
+  addedMembers = new Set<string>(),
 ) {
   const value = record.payload.value;
 
   // Check if record has been registered in the local memory
-  if (addedMembers.has(value)) return;
+  if (addedMembers.has(value)) {
+    return;
+  } 
   addedMembers.add(value);
 
   // Check if record is already written in the collection
@@ -149,6 +151,8 @@ export async function ingest(
     DATABASE_COLLECTION.relations,
   );
 
+  const addedMembers = new Set<string>();
+
   data.data(async (input: RDF.Quad[] | string) => {
     const data = maybe_parse(input);
     if (!ingestData) {
@@ -181,7 +185,7 @@ export async function ingest(
     // Make sure duplicated members are skipped
     const updateData: DataRecord[] = [];
     for (const r of records) {
-      await addDataRecord(updateData, r, data, memberCollection);
+      await addDataRecord(updateData, r, data, memberCollection, addedMembers);
     }
 
     // Write members to DATA collection
