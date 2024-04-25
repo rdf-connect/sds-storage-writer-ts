@@ -25,7 +25,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@ajuvercr/js-runner": "^0.1.12",
+    "@ajuvercr/js-runner": "^0.2.0-alpha.2",
     "@jest/globals": "^29.7.0",
     "@types/n3": "^1.16.4",
     "@types/node": "^20.4.0",
