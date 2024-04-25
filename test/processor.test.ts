@@ -12,8 +12,8 @@ const prefixes = `
 
 function testReader(arg: any) {
   expect(arg).toBeInstanceOf(Object);
-  expect(arg.channel).toBeDefined();
-  expect(arg.channel.id).toBeDefined();
+  expect(arg.config.channel).toBeDefined();
+  expect(arg.config.channel.id).toBeDefined();
   expect(arg.ty).toBeDefined();
 }
 
@@ -35,12 +35,7 @@ test("ingest configuration", async () => {
 [ ] a js:Ingest;
   js:dataInput <jr>;
   js:metadataInput <jr>;
-  js:database [
-    js:url <http://me.db>;
-    js:metadata "meta";
-    js:data "data";
-    js:index "index";
-  ];
+  js:database <http://me.db>;
   js:pageSize 500;
   js:branchSize 3;
   js:minBucketSpan 600.
@@ -55,7 +50,7 @@ test("ingest configuration", async () => {
   };
 
   const { processors, quads, shapes: config } = await extractProcessors(source);
-  expect(processors.length).toBe(1);
+  expect(processors.length).toBe(2);
 
   const proc = processors[0];
   expect(proc).toBeDefined();
@@ -68,10 +63,7 @@ test("ingest configuration", async () => {
   testReader(i);
   testReader(mi);
   expect(db).toBeDefined();
-  expect(db.url).toBe("http://me.db");
-  expect(db.index).toBe("index");
-  expect(db.metadata).toBe("meta");
-  expect(db.data).toBe("data");
+  expect(db).toBe("http://me.db");
   expect(pageSize).toBe(500);
   expect(branchSize).toBe(3);
   expect(minBucketSpan).toBe(600);

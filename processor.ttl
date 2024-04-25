@@ -6,41 +6,9 @@
 @prefix sh: <http://www.w3.org/ns/shacl#>.
 @prefix dc: <http://purl.org/dc/terms/>.
 
-[ ] a sh:NodeShape;
-  sh:targetClass js:DatabaseConfig;
-  sh:property [
-    sh:datatype xsd:string;
-    sh:path js:metadata;
-    sh:minCount 1;
-    sh:maxCount 1;
-    sh:defaultValue "meta";
-    sh:name "metadata";
-    sh:description "Name of the metadata collection";
-  ], [
-    sh:datatype xsd:string;
-    sh:path js:data;
-    sh:minCount 1;
-    sh:maxCount 1;
-    sh:name "data";
-    sh:description "Name of the data collection";
-  ], [
-    sh:datatype xsd:string;
-    sh:path js:index;
-    sh:minCount 1;
-    sh:maxCount 1;
-    sh:name "index";
-    sh:description "Name of the index collection";
-  ], [
-    sh:datatype xsd:string;
-    sh:path js:url;
-    sh:maxCount 1;
-    sh:name "url";
-    sh:description "Collection url used to connect to the mongo database";
-  ].
-
 js:Ingest a js:JsProcess;
   dc:title "LDES-server ingestor (mongoDB)";
-  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
+  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
   js:file <./lib/index.js>;
   js:function "ingest";
   js:location <./>;
@@ -56,7 +24,7 @@ js:Ingest a js:JsProcess;
       fnom:implementationParameterPosition "1"^^xsd:int;
     ], [
       a fnom:PositionParameterMapping;
-      fnom:functionParameter "Database config";
+      fnom:functionParameter "Database Url";
       fnom:implementationParameterPosition "2"^^xsd:int;
     ], [
       a fnom:PositionParameterMapping;
@@ -88,11 +56,11 @@ js:Ingest a js:JsProcess;
     sh:minCount 1;
     sh:maxCount 1;
   ], [
-    sh:class js:DatabaseConfig;
+    sh:datatype xsd:string;
     sh:path js:database;
     sh:minCount 1;
     sh:maxCount 1;
-    sh:name "Database config";
+    sh:name "Database Url";
   ], [
     sh:datatype xsd:integer;
     sh:path js:pageSize;
@@ -111,5 +79,50 @@ js:Ingest a js:JsProcess;
     sh:maxCount 1;
     sh:defaultValue 300;
     sh:name "Min bucket span";
+  ].
+
+js:SDSIngest a js:JsProcess;
+  dc:title "LDES-server ingestor (mongoDB)";
+  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize).";
+  js:file <./lib/index.js>;
+  js:function "sds_ingest";
+  js:location <./>;
+  js:mapping [
+    a fno:Mapping;
+    fno:parameterMapping [
+      a fnom:PositionParameterMapping;
+      fnom:functionParameter "Data Input Channel";
+      fnom:implementationParameterPosition "0"^^xsd:int;
+    ], [
+      a fnom:PositionParameterMapping;
+      fnom:functionParameter "Metadata Input Channel";
+      fnom:implementationParameterPosition "1"^^xsd:int;
+    ], [
+      a fnom:PositionParameterMapping;
+      fnom:functionParameter "Database Url";
+      fnom:implementationParameterPosition "2"^^xsd:int;
+    ];
+  ].
+
+[ ] a sh:NodeShape;
+  sh:targetClass js:SDSIngest;
+  sh:property [
+    sh:class :ReaderChannel;
+    sh:path js:dataInput;
+    sh:name "Data Input Channel";
+    sh:minCount 1;
+    sh:maxCount 1;
+  ], [
+    sh:class :ReaderChannel;
+    sh:path js:metadataInput;
+    sh:name "Metadata Input Channel";
+    sh:minCount 1;
+    sh:maxCount 1;
+  ], [
+    sh:datatype xsd:string;
+    sh:path js:database;
+    sh:minCount 1;
+    sh:maxCount 1;
+    sh:name "Database Url";
   ].
 
