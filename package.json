@@ -1,7 +1,7 @@
 {
-  "name": "@treecg/sds-storage-writer-mongo",
+  "name": "@rdfc/sds-storage-writer-ts",
   "version": "0.2.6",
-  "description": "A processor to write SDS streams into a MongoBD instance",
+  "description": "A RDF-Connect processor to write SDS streams into a given storage system",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
@@ -16,7 +16,8 @@
     "SDS",
     "TREE",
     "LDES",
-    "MongoBD"
+    "MongoBD",
+    "RDF-Connect"
   ],
   "author": "Arthur Vercruysse",
   "contributors": [

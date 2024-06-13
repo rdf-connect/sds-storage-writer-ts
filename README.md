@@ -1,8 +1,8 @@
-# A SDS storage writer for MongoDB
+# A RDF-Connect SDS storage writer
 
-[![Bun CI](https://github.com/TREEcg/sds-storage-writer-mongo/actions/workflows/build-test.yml/badge.svg)](https://github.com/TREEcg/sds-storage-writer-mongo/actions/workflows/build-test.yml) [![npm](https://img.shields.io/npm/v/@treecg/sds-storage-writer-mongo.svg?style=popout)](https://npmjs.com/package/@treecg/sds-storage-writer-mongo)
+[![Bun CI](https://github.com/rdf-connect/sds-storage-writer-ts/actions/workflows/build-test.yml/badge.svg)](https://github.com/rdf-connect/sds-storage-writer-ts/actions/workflows/build-test.yml) [![npm](https://img.shields.io/npm/v/@rdfc/sds-storage-writer-ts.svg?style=popout)](https://npmjs.com/package/@rdfc/sds-storage-writer-ts)
 
-Given an [SDS stream](https://w3id.org/sds/specification) and its correspondent stream of members, this processor will write everything into a MongoDB instance.
+Given an [SDS stream](https://w3id.org/sds/specification) and its correspondent stream of members, this processor will write everything into a supported data storage system. So far, it only supports MongoDB instances.
 
 SDS stream updates are stored into MongoDB collections for the LDES server to find this information when serving requests. If a `ldes:timestampPath` property is given as part of the dataset metadata, the storage writer will automatically start up a timestamp fragmentation, based on a B+ Tree strategy.
 
@@ -33,9 +33,13 @@ With this information, the data of the member is stored in the MongoDB collectio
 
 ## Usage
 
-### As a [Connector Architecture](https://the-connector-architecture.github.io/site/docs/1_Home) processor
+### As a [RDF-Connect](https://rdf-connect.github.io/rdfc.github.io/) processor
 
-This repository exposes the Connector Architecture processor [`js:Ingest`](https://github.com/TREEcg/sds-storage-writer-mongo/blob/master/configs/processor.ttl#L41), which can be used within data processing pipelines to write a SDS streams into a MongoDB instance. The processor can be configured as follows:
+This repository exposes the following RDF-Connect processors:
+
+#### [`js:Ingest`](https://github.com/rdf-connect/sds-storage-writer-mongo/blob/master/configs/processor.ttl#L41)
+
+This processor can be used within data processing pipelines to write a SDS streams into a MongoDB instance. The processor can be configured as follows:
 
 ```turtle
 @prefix : <https://w3id.org/conn#>.
