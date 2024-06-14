@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll } from "@jest/globals";
-import { SimpleStream } from "@ajuvercr/js-runner";
+import { SimpleStream } from "@rdfc/js-runner";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { Collection, Db, MongoClient } from "mongodb";
 import { ingest, DBConfig, DataRecord } from "../src/index";

@@ -1,5 +1,5 @@
 import type * as RDF from "@rdfjs/types";
-import { Stream } from "@ajuvercr/js-runner";
+import { Stream } from "@rdfc/js-runner";
 import {
    LDES,
    Member,
