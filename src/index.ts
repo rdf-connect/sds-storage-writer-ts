@@ -1,23 +1,16 @@
 import type * as RDF from "@rdfjs/types";
-import { Stream } from "@rdfc/js-runner";
-import {
-   LDES,
-   Member,
-   PROV,
-   RDF as RDFT,
-   RelationType,
-   SDS,
-} from "@treecg/types";
-import { Collection, MongoClient } from "mongodb";
-import { Parser, Writer } from "n3";
-import { env } from "process";
+import {Stream} from "@rdfc/js-runner";
+import {LDES, Member, PROV, RDF as RDFT, RelationType, SDS,} from "@treecg/types";
+import {Collection, MongoClient} from "mongodb";
+import {Parser, Writer} from "n3";
+import {env} from "process";
 import winston from "winston";
-import { handleTimestampPath, TREEFragment } from "./fragmentHelper";
+import {TREEFragment} from "./fragmentHelper";
 
 const consoleTransport = new winston.transports.Console();
 const logger = winston.createLogger({
    format: winston.format.combine(
-      winston.format.colorize({ level: true }),
+      winston.format.colorize({level: true}),
       winston.format.simple(),
    ),
    transports: [consoleTransport],
@@ -106,59 +99,10 @@ function maybe_parse(data: RDF.Quad[] | string): RDF.Quad[] {
    }
 }
 
-function getRelatedBuckets(
-   quads: RDF.Quad[],
-   bucket: RDF.Term,
-   done: Set<string>,
-): RDF.Term[] {
-   const set: RDF.Term[] = [];
-   const get = (q: RDF.Term) => {
-      if (done.has(q.value)) {
-         return;
-      }
-      done.add(q.value);
-      set.push(q);
-      // Find forward relations
-      quads
-         .filter(
-            (x) => x.subject.equals(q) && x.predicate.equals(SDS.terms.relation),
-         )
-         .map((x) => x.object)
-         .flatMap((bn) =>
-            quads
-               .filter(
-                  (q) =>
-                     q.subject.equals(bn) &&
-                     q.predicate.equals(SDS.terms.relationBucket),
-               )
-               .map((x) => x.object),
-         )
-         .forEach(get);
-
-      // Find backwards relations
-      quads
-         .filter(
-            (x) =>
-               x.object.equals(q) && x.predicate.equals(SDS.terms.relationBucket),
-         )
-         .map((x) => x.subject)
-         .flatMap((bn) =>
-            quads
-               .filter(
-                  (q) =>
-                     q.object.equals(bn) && q.predicate.equals(SDS.terms.relation),
-               )
-               .map((x) => x.subject),
-         )
-         .forEach(get);
-   };
-
-   get(bucket);
-   return set;
-}
-
-function parseBool(bo?: string): boolean {
-   if (!bo) {
+function parseBool(bo?: string): boolean | undefined {
+   if (bo === undefined) {
+      return undefined;
+   } else if (!bo) {
       return false;
    } else {
       const bos = bo.toLowerCase();
@@ -167,13 +111,24 @@ function parseBool(bo?: string): boolean {
 }
 
 function gatherBuckets(
-   buckets: Bucket[],
    data: RDF.Quad[],
-   subject: RDF.Term,
-   stream: string,
-   found: Set<string>,
-) {
-   for (let bucket of getRelatedBuckets(data, subject, found)) {
+): Bucket[] {
+   const buckets: Bucket[] = [];
+
+   const bucketTerms: Set<RDF.Term> = new Set();
+   data.filter(q =>
+      q.predicate.equals(RDFT.terms.type)
+      && q.object.equals(SDS.terms.custom("Bucket"))
+      && q.graph.equals(SDS.terms.custom("DataDescription")))
+      .map(q => q.subject).forEach(bucket => bucketTerms.add(bucket));
+
+   data.filter(q =>
+      q.predicate.equals(SDS.terms.bucket)
+      && q.graph.equals(SDS.terms.custom("DataDescription")))
+      .map(q => q.object).forEach(bucket => bucketTerms.add(bucket));
+
+   bucketTerms.forEach(bucket => {
+
       const isRoot = data.find(
          (q) =>
             q.subject.equals(bucket) &&
@@ -184,6 +139,26 @@ function gatherBuckets(
             q.subject.equals(bucket) &&
             q.predicate.equals(SDS.terms.custom("immutable")),
       )?.object.value;
+
+      // If the subject has a triple with the Stream, use that one. Otherwise, we need to find the stream via the record the bucket is attached to.
+      const stream = data.find(
+         (q) =>
+            q.subject.equals(bucket) &&
+            q.predicate.equals(SDS.terms.stream),
+      )?.object.value || data.find(
+         (q) =>
+            q.subject.equals(data.find(
+               (record) =>
+                  record.predicate.equals(SDS.terms.bucket) &&
+                  record.object.equals(bucket),
+            )?.subject) &&
+            q.predicate.equals(SDS.terms.stream),
+      )?.object.value;
+      if (!stream) {
+         logger.error(`Found SDS bucket without a stream! ${bucket.value}`);
+         return;
+      }
+
       const b = {
          root: isRoot === "true",
          id: bucket.value,
@@ -192,6 +167,7 @@ function gatherBuckets(
          immutable: parseBool(immutable),
       };
 
+      // Find all relations of the bucket
       const relations = data
          .filter(
             (q) =>
@@ -215,11 +191,12 @@ function gatherBuckets(
             q.predicate.equals(SDS.terms.relationValue),
          )?.object.value;
 
-         b.relations.push({ type, bucket: target, path, value });
+         b.relations.push({type, bucket: target, path, value});
       }
 
       buckets.push(b);
-   }
+   });
+   return buckets;
 }
 
 function gatherRecords(
@@ -268,6 +245,24 @@ function gatherRecords(
    return out;
 }
 
+async function emptyBuckets(data: RDF.Quad[], collection: Collection<TREEFragment>) {
+   const bucketsToEmpty = data.filter(q =>
+      q.predicate.equals(SDS.terms.custom("empty")) &&
+      q.object.value === "true" &&
+      q.graph.equals(SDS.terms.custom("DataDescription")))
+      .map(q => q.subject);
+
+   for (const bucket of bucketsToEmpty) {
+      await collection.updateOne(
+         {id: bucket.value},
+         {
+            $set: {members: []},
+         },
+         {upsert: true},
+      );
+   }
+}
+
 // This could be a memory problem in the long run
 // TODO: Find a way to persist written records efficiently
 //const addedMembers: Set<string> = new Set();
@@ -284,12 +279,16 @@ async function addDataRecord(
    //addedMembers.add(value);
 
    // Check if record is already written in the collection
-   const present = (await collection.countDocuments({ id: value })) > 0;
+   const present = (await collection.countDocuments({id: value})) > 0;
    if (present) return;
 
    const member = filterMember(quads, record.payload, [
       (q) => q.predicate.equals(SDS.terms.payload),
    ]);
+
+   if (!member?.length) {
+      return;
+   }
 
    const ser = new Writer().quadsToString(member);
 
@@ -302,6 +301,7 @@ async function addDataRecord(
 
 const setRoots: Set<string> = new Set();
 const immutables: Set<string> = new Set();
+
 async function addBucket(
    bucket: Bucket,
    collection: Collection<TREEFragment>,
@@ -310,32 +310,41 @@ async function addBucket(
    if (bucket.root && !setRoots.has(bucket.stream)) {
       setRoots.add(bucket.stream);
       await collection.updateOne(
-         { streamId: bucket.stream, id: bucket.id },
+         {streamId: bucket.stream, id: bucket.id},
          {
-            $set: { root: true },
+            $set: {root: true},
          },
-         { upsert: true },
+         {upsert: true},
       );
    }
 
    if (bucket.immutable && !immutables.has(bucket.id)) {
       immutables.add(bucket.id);
       await collection.updateOne(
-         { streamId: bucket.stream, id: bucket.id },
+         {streamId: bucket.stream, id: bucket.id},
          {
-            $set: { immutable: true },
+            $set: {immutable: true},
          },
-         { upsert: true },
+         {upsert: true},
+      );
+   } else if (bucket.immutable === false) {
+      // If it is explicitly set as false, set it in the database, so we persist the bucket.
+      await collection.updateOne(
+         {streamId: bucket.stream, id: bucket.id},
+         {
+            $set: {immutable: false},
+         },
+         {upsert: true},
       );
    }
 
    for (let newRelation of bucket.relations) {
       await collection.updateOne(
-         { streamId: bucket.stream, id: bucket.id },
+         {streamId: bucket.stream, id: bucket.id},
          {
-            $push: { relations: newRelation },
+            $addToSet: {relations: newRelation},
          },
-         { upsert: true },
+         {upsert: true},
       );
    }
 }
@@ -409,9 +418,9 @@ async function setup_metadata(
 
          const ser = new Writer().quadsToString(streamMember);
          await metaCollection.updateOne(
-            { type: SDS.Stream, id: streamId.value },
-            { $set: { value: ser } },
-            { upsert: true },
+            {type: SDS.Stream, id: streamId.value},
+            {$set: {value: ser}},
+            {upsert: true},
          );
       }
    };
@@ -419,7 +428,7 @@ async function setup_metadata(
    metadata.data(handleMetadata);
 
    if (metadata.lastElement) {
-      handleMetadata(metadata.lastElement);
+      await handleMetadata(metadata.lastElement);
    }
 }
 
@@ -427,9 +436,6 @@ export async function ingest(
    data: Stream<string | RDF.Quad[]>,
    metadata: Stream<string | RDF.Quad[]>,
    database: DBConfig,
-   maxSize: number = 100,
-   k: number = 4,
-   minBucketSpan: number = 300
 ) {
    const url = database.url || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
    const mongo = await new MongoClient(url).connect();
@@ -442,7 +448,6 @@ export async function ingest(
    let ingestMetadata = true;
    let ingestData = true;
    let closed = false;
-   let lastMemberTimestamp = null;
 
    const closeMongo = () => {
       if (!ingestMetadata && !ingestData && !closed) {
@@ -472,53 +477,16 @@ export async function ingest(
       const bs = record.buckets;
       if (bs.length === 0) {
          await indexCollection.updateOne(
-            { root: true, streamId: record.stream, id: "" },
-            { $push: { members: record.payload.value } },
-            { upsert: true },
+            {root: true, streamId: record.stream, id: ""},
+            {$addToSet: {members: record.payload.value}},
+            {upsert: true},
          );
       } else {
          for (let bucket of bs) {
             await indexCollection.updateOne(
-               { streamId: record.stream, id: bucket.value },
-               { $push: { members: record.payload.value } },
-               { upsert: true },
-            );
-         }
-      }
-   };
-
-   const pushTimstampMemberToDB = async (record: SDSRecord) => {
-      const bs = record.buckets;
-      const timestamp = new Date(record.timestampValue!);
-
-      if (bs.length === 0) {
-         await handleTimestampPath(
-            null,
-            record.stream,
-            streamTimestampPaths[record.stream],
-            timestamp,
-            record.payload.value,
-            indexCollection,
-            memberCollection,
-            maxSize,
-            k,
-            minBucketSpan,
-            logger
-         );
-      } else {
-         for (let bucket of bs) {
-            await handleTimestampPath(
-               bucket.value,
-               record.stream,
-               streamTimestampPaths[record.stream],
-               timestamp,
-               record.payload.value,
-               indexCollection,
-               memberCollection,
-               maxSize,
-               k,
-               minBucketSpan,
-               logger
+               {streamId: record.stream, id: bucket.value},
+               {$addToSet: {members: record.payload.value}},
+               {upsert: true},
             );
          }
       }
@@ -550,56 +518,16 @@ export async function ingest(
 
       // Update INDEX collection accordingly
       for (const r of records) {
-         await (r.timestampValue ? pushTimstampMemberToDB(r) : pushMemberToDB(r));
+         await pushMemberToDB(r);
       }
 
-      const isDefaultTimestamp = records[0].timestampValue !== undefined;
-
-      // If the fragmentation strategy is the default timestamp-based
-      // we need to handle the labeling of buckets/fragments as immutable
-      // based on the current time
-      if (isDefaultTimestamp) {
-         // Last known member timestamp
-         lastMemberTimestamp = new Date(records[records.length -1].timestampValue!)
-         // Gather all mutable fragments that have expired
-
-         // TODO: Check if we can directly update all expired fragments
-         // Not sure how to add the timestamp and the span while querying
-         const expiredBuckets = await indexCollection.find({
-            timeStamp: { $lte: lastMemberTimestamp },
-            immutable: false
-         }).toArray();
-
-         for (const buck of expiredBuckets) {
-            const expDate = buck.timeStamp!.getTime() + buck.span;
-            if (expDate < lastMemberTimestamp.getTime()) {
-               logger.debug(`Labeling bucket ${buck.timeStamp?.toISOString()} (span: ${buck.span}) as immutable`);
-               // Label these buckets as immutable
-               await indexCollection.updateOne(buck, {
-                  $set: { immutable: true }
-               });
-            }
-         }
+      const buckets: Bucket[] = gatherBuckets(data);
+      for (let bucket of buckets) {
+         await addBucket(bucket, indexCollection);
       }
 
-      // This next steps are only performed if the fragmentation strategy
-      // is already defined in the SDS metadata and the stream is not relying
-      // on the default timestamp-based strategy, which is handled within the
-      // pushTimstampMemberToDB() function.
-      if (!isDefaultTimestamp) {
-         const found: Set<string> = new Set();
-         const buckets: Bucket[] = [];
-
-         for (const r of records) {
-            r.buckets.forEach((b) =>
-               gatherBuckets(buckets, data, b, r.stream, found),
-            );
-         }
-
-         for (let bucket of buckets) {
-            await addBucket(bucket, indexCollection);
-         }
-      }
+      // Empty buckets that are marked so.
+      await emptyBuckets(data, indexCollection);
    });
 
    logger.debug("[ingest] Attached data handler");
