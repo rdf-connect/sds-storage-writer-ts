@@ -4,7 +4,7 @@
 
 Given an [SDS stream](https://w3id.org/sds/specification) and its correspondent stream of members, this processor will write everything into a supported data storage system. So far, it only supports MongoDB instances.
 
-SDS stream updates are stored into MongoDB collections for the LDES server to find this information when serving requests. If a `ldes:timestampPath` property is given as part of the dataset metadata, the storage writer will automatically start up a timestamp fragmentation, based on a B+ Tree strategy.
+SDS stream updates are stored into MongoDB collections for the LDES server to find this information when serving requests.
 
 An example of a SDS data stream with a predefined fragmentation strategy is shown next:
 
@@ -54,9 +54,7 @@ This processor can be used within data processing pipelines to write a SDS strea
     js:metadata "METADATA";
     js:data "DATA";
     js:index "INDEX";
-  ];
-  js:pageSize 500;
-  js:branchSize 4.
+  ].
 ```
 
 ### As a library
@@ -68,8 +66,6 @@ async function ingest(
   data: Stream<string | Quad[]>, 
   metadata: Stream<string | RDF.Quad[]>, 
   database: DBConfig,
-  maxsize: number = 100,
-  k: number = 4
 ) { /* snip */ }
 ```
 
@@ -78,8 +74,6 @@ arguments:
 - `data`: a stream reader that carries data (as `string` or `Quad[]`).
 - `metadata`: a stream reader that carries SDS metadata (as `string` or `Quad[]`).
 - `database`: connection parameters for a reachable MongoDB instance.
-- `maxsize`: max number of members per fragment.
-- `k`: max number of child nodes in the default time-based B+ Tree fragmentation.
 
 ## Authors and License
 
