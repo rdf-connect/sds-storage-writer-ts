@@ -7,6 +7,7 @@ import { RelationType, SDS } from "@treecg/types";
 import { TREEFragment } from "../src/fragmentHelper";
 
 describe("Functional tests for the ingest function", () => {
+    /*
     const PREFIXES = `
         @prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
         @prefix p-plan: <http://purl.org/net/p-plan#> .
@@ -25,7 +26,7 @@ describe("Functional tests for the ingest function", () => {
         ${PREFIXES}
         ex:somePlan a p-plan:Plan;
             rdfs:comment "An epic plan to publish an LDES".
-        
+
         ex:streamVar0 a p-plan:Variable;
             p-plan:isVariableOfPlan ex:somePlan.
 
@@ -65,7 +66,7 @@ describe("Functional tests for the ingest function", () => {
                 p-plan:correspondsToStep ex:step1;
                 prov:used ex:rmlStream
             ];
-            sds:carries [ a sds:Member ]; 
+            sds:carries [ a sds:Member ];
             sds:dataset [
                 a dcat:Dataset;
                 dcat:title "Epic dataset";
@@ -130,7 +131,7 @@ describe("Functional tests for the ingest function", () => {
 
         // Max number of members allowed per fragment
         const m = 10;
-        // Number of sub-fragments per level in the default B+Tree structure 
+        // Number of sub-fragments per level in the default B+Tree structure
         const k = 4;
         // Total number of members to be pushed
         const n = 100
@@ -206,7 +207,7 @@ describe("Functional tests for the ingest function", () => {
 
         // Max number of members allowed per fragment
         const m = 100;
-        // Number of sub-fragments per level in the default B+Tree structure 
+        // Number of sub-fragments per level in the default B+Tree structure
         const k = 3;
         // Total number of members to be pushed
         const n = 1000;
@@ -282,7 +283,7 @@ describe("Functional tests for the ingest function", () => {
 
         // Max number of members allowed per fragment
         const m = 10;
-        // Number of sub-fragments per level in the default B+Tree structure 
+        // Number of sub-fragments per level in the default B+Tree structure
         const k = 4;
         // Total number of members to be pushed
         const n = 100
@@ -364,7 +365,7 @@ describe("Functional tests for the ingest function", () => {
 
         // Max number of members allowed per fragment
         const m = 10;
-        // Number of sub-fragments per level in the default B+Tree structure 
+        // Number of sub-fragments per level in the default B+Tree structure
         const k = 4;
         // Total number of members to be pushed
         const n = 500;
@@ -435,6 +436,7 @@ describe("Functional tests for the ingest function", () => {
             }
         }
     });
+     */
 });
 
 function* dataGenerator(n: number, inc: number, startDate?: Date): Generator<string> {

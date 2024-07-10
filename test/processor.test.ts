@@ -29,10 +29,7 @@ describe("SDS storage writer tests", () => {
       js:metadata "meta";
       js:data "data";
       js:index "index";
-    ];
-    js:pageSize 500;
-    js:branchSize 3;
-    js:minBucketSpan 600.
+    ].
   `;
         const baseIRI = process.cwd() + "/config.ttl";
         console.log(baseIRI);
@@ -51,9 +48,9 @@ describe("SDS storage writer tests", () => {
 
         const argss = extractSteps(proc, quads, config);
         expect(argss.length).toBe(1);
-        expect(argss[0].length).toBe(6);
+        expect(argss[0].length).toBe(3);
 
-        const [[i, mi, db, pageSize, branchSize, minBucketSpan]] = argss;
+        const [[i, mi, db]] = argss;
         testReader(i);
         testReader(mi);
         expect(db).toBeDefined();
@@ -61,9 +58,6 @@ describe("SDS storage writer tests", () => {
         expect(db.index).toBe("index");
         expect(db.metadata).toBe("meta");
         expect(db.data).toBe("data");
-        expect(pageSize).toBe(500);
-        expect(branchSize).toBe(3);
-        expect(minBucketSpan).toBe(600);
 
         await checkProc(proc.file, proc.func);
     });
