@@ -1,7 +1,7 @@
 import type * as RDF from "@rdfjs/types";
 import {Stream} from "@rdfc/js-runner";
 import {LDES, Member, PROV, RDF as RDFT, RelationType, SDS,} from "@treecg/types";
-import {Collection, MongoClient} from "mongodb";
+import {AnyBulkWriteOperation, Collection, MongoClient} from "mongodb";
 import {Parser, Writer} from "n3";
 import {env} from "process";
 import winston from "winston";
@@ -245,22 +245,22 @@ function gatherRecords(
    return out;
 }
 
-async function emptyBuckets(data: RDF.Quad[], collection: Collection<TREEFragment>) {
+function emptyBuckets(data: RDF.Quad[], operations: AnyBulkWriteOperation<TREEFragment>[]) {
    const bucketsToEmpty = data.filter(q =>
       q.predicate.equals(SDS.terms.custom("empty")) &&
       q.object.value === "true" &&
       q.graph.equals(SDS.terms.custom("DataDescription")))
       .map(q => q.subject);
 
-   for (const bucket of bucketsToEmpty) {
-      await collection.updateOne(
-         {id: bucket.value},
-         {
+   operations.push({
+      updateMany: {
+         filter: {id: {$in: bucketsToEmpty.map(b => b.value)}},
+         update: {
             $set: {members: []},
          },
-         {upsert: true},
-      );
-   }
+         upsert: true,
+      }
+   });
 }
 
 // This could be a memory problem in the long run
@@ -278,10 +278,6 @@ async function addDataRecord(
    //if (addedMembers.has(value)) return;
    //addedMembers.add(value);
 
-   // Check if record is already written in the collection
-   const present = (await collection.countDocuments({id: value})) > 0;
-   if (present) return;
-
    const member = filterMember(quads, record.payload, [
       (q) => q.predicate.equals(SDS.terms.payload),
    ]);
@@ -289,6 +285,11 @@ async function addDataRecord(
    if (!member?.length) {
       return;
    }
+
+   // Check if record is already written in the collection
+   const present = (await collection.countDocuments({id: value}, {limit: 1})) > 0;
+   if (present) return;
+
 
    const ser = new Writer().quadsToString(member);
 
@@ -302,51 +303,35 @@ async function addDataRecord(
 const setRoots: Set<string> = new Set();
 const immutables: Set<string> = new Set();
 
-async function addBucket(
+function addBucket(
    bucket: Bucket,
-   collection: Collection<TREEFragment>,
+   operations: AnyBulkWriteOperation<TREEFragment>[],
 ) {
+   const set: any = {};
    // Handle root setting
    if (bucket.root && !setRoots.has(bucket.stream)) {
       setRoots.add(bucket.stream);
-      await collection.updateOne(
-         {streamId: bucket.stream, id: bucket.id},
-         {
-            $set: {root: true},
-         },
-         {upsert: true},
-      );
+      set.root = true;
    }
 
    if (bucket.immutable && !immutables.has(bucket.id)) {
       immutables.add(bucket.id);
-      await collection.updateOne(
-         {streamId: bucket.stream, id: bucket.id},
-         {
-            $set: {immutable: true},
-         },
-         {upsert: true},
-      );
+      set.immutable = true;
    } else if (bucket.immutable === false) {
       // If it is explicitly set as false, set it in the database, so we persist the bucket.
-      await collection.updateOne(
-         {streamId: bucket.stream, id: bucket.id},
-         {
-            $set: {immutable: false},
-         },
-         {upsert: true},
-      );
+      set.immutable = false;
    }
 
-   for (let newRelation of bucket.relations) {
-      await collection.updateOne(
-         {streamId: bucket.stream, id: bucket.id},
-         {
-            $addToSet: {relations: newRelation},
+   operations.push({
+      updateOne: {
+         filter: {streamId: bucket.stream, id: bucket.id},
+         update: {
+            $set: set,
+            $addToSet: {relations: {$each: bucket.relations}},
          },
-         {upsert: true},
-      );
-   }
+         upsert: true,
+      }
+   });
 }
 
 async function setup_metadata(
@@ -473,22 +458,28 @@ export async function ingest(
    const memberCollection = db.collection<DataRecord>(database.data);
    const indexCollection = db.collection<TREEFragment>(database.index);
 
-   const pushMemberToDB = async (record: SDSRecord) => {
+   const pushMemberToDB = (record: SDSRecord, operations: AnyBulkWriteOperation<TREEFragment>[]) => {
       const bs = record.buckets;
       if (bs.length === 0) {
-         await indexCollection.updateOne(
-            {root: true, streamId: record.stream, id: ""},
-            {$addToSet: {members: record.payload.value}},
-            {upsert: true},
-         );
+         operations.push({
+            updateOne: {
+               filter: {root: true, streamId: record.stream, id: ""},
+               update: {
+                  $addToSet: {members: record.payload.value},
+               },
+               upsert: true,
+            }
+         });
       } else {
-         for (let bucket of bs) {
-            await indexCollection.updateOne(
-               {streamId: record.stream, id: bucket.value},
-               {$addToSet: {members: record.payload.value}},
-               {upsert: true},
-            );
-         }
+         operations.push({
+            updateMany: {
+               filter: {streamId: record.stream, id: {$in: bs.map(b => b.value)}},
+               update: {
+                  $addToSet: {members: record.payload.value},
+               },
+               upsert: true,
+            }
+         });
       }
    };
 
@@ -517,17 +508,20 @@ export async function ingest(
       }
 
       // Update INDEX collection accordingly
+      const indexOperations: AnyBulkWriteOperation<TREEFragment>[] = [];
       for (const r of records) {
-         await pushMemberToDB(r);
+         pushMemberToDB(r, indexOperations);
       }
 
       const buckets: Bucket[] = gatherBuckets(data);
       for (let bucket of buckets) {
-         await addBucket(bucket, indexCollection);
+         addBucket(bucket, indexOperations);
       }
 
       // Empty buckets that are marked so.
-      await emptyBuckets(data, indexCollection);
+      emptyBuckets(data, indexOperations);
+
+      await indexCollection.bulkWrite(indexOperations);
    });
 
    logger.debug("[ingest] Attached data handler");
