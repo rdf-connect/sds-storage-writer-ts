@@ -457,6 +457,8 @@ export async function ingest(
 
    const memberCollection = db.collection<DataRecord>(database.data);
    const indexCollection = db.collection<TREEFragment>(database.index);
+   await indexCollection.createIndex({ streamId: 1, id: 1 });
+
 
    const pushMemberToDB = (record: SDSRecord, operations: AnyBulkWriteOperation<TREEFragment>[]) => {
       const bs = record.buckets;
