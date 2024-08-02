@@ -461,6 +461,7 @@ export async function ingest(
    logger.debug("[ingest] Attached metadata handler");
 
    const memberCollection = db.collection<DataRecord>(database.data);
+   await memberCollection.createIndex({id: 1});
    const indexCollection = db.collection<TREEFragment>(database.index);
    await indexCollection.createIndex({ streamId: 1, id: 1 });
 
