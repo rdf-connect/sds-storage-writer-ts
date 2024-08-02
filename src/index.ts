@@ -252,6 +252,11 @@ function emptyBuckets(data: RDF.Quad[], operations: AnyBulkWriteOperation<TREEFr
       q.graph.equals(SDS.terms.custom("DataDescription")))
       .map(q => q.subject);
 
+   // Only perform the operation if there are buckets to empty.
+   if (bucketsToEmpty.length === 0) {
+      return;
+   }
+
    operations.push({
       updateMany: {
          filter: {id: {$in: bucketsToEmpty.map(b => b.value)}},
