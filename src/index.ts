@@ -4,19 +4,10 @@ import {LDES, Member, PROV, RDF as RDFT, RelationType, SDS,} from "@treecg/types
 import {AnyBulkWriteOperation, Collection, MongoClient} from "mongodb";
 import {Parser, Writer} from "n3";
 import {env} from "process";
-import winston from "winston";
 import {TREEFragment} from "./fragmentHelper";
+import {getLoggerFor} from "./utils/logUtil";
 
-const consoleTransport = new winston.transports.Console();
-const logger = winston.createLogger({
-   format: winston.format.combine(
-      winston.format.colorize({level: true}),
-      winston.format.simple(),
-   ),
-   transports: [consoleTransport],
-});
-
-consoleTransport.level = process.env.LOG_LEVEL || "info";
+const logger = getLoggerFor("ingest");
 
 type SDSRecord = {
    stream: string;
@@ -155,7 +146,7 @@ function gatherBuckets(
             q.predicate.equals(SDS.terms.stream),
       )?.object.value;
       if (!stream) {
-         logger.error(`Found SDS bucket without a stream! ${bucket.value}`);
+         logger.error(`[gatherBuckets] Found SDS bucket without a stream! ${bucket.value}`);
          return;
       }
 
@@ -212,7 +203,7 @@ function gatherRecords(
          (q) => q.subject.equals(recordId) && q.predicate.equals(SDS.terms.stream),
       )?.object.value;
       if (!stream) {
-         logger.error("Found SDS record without a stream!");
+         logger.error("[gatherRecords] Found SDS record without a stream!");
          continue;
       }
       const payload = data.find(
@@ -365,7 +356,7 @@ async function setup_metadata(
       .toArray();
 
    logger.debug(
-      `Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
+      `[setup_metadata] Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
          (x) => x.id.value,
       )})`,
    );
@@ -373,7 +364,7 @@ async function setup_metadata(
    const handleMetadata = async (meta: string | RDF.Quad[]) => {
       meta = maybe_parse(meta);
       if (!ingestMetadata) {
-         logger.error("Cannot handle metadata, mongo is closed");
+         logger.error("[setup_metadata] Cannot handle metadata, mongo is closed");
          return;
       }
 
@@ -431,7 +422,7 @@ export async function ingest(
    const mongo = await new MongoClient(url).connect();
    const db = mongo.db();
 
-   logger.debug(`[ingest] Connected to ${url}`);
+   logger.debug(`Connected to ${url}`);
 
    const streamTimestampPaths: { [streamId: string]: string } = {};
 
@@ -441,7 +432,7 @@ export async function ingest(
 
    const closeMongo = () => {
       if (!ingestMetadata && !ingestData && !closed) {
-         logger.info("[ingest] Closing MongoDB client connection");
+         logger.info("Closing MongoDB client connection");
          closed = true;
          return mongo.close();
       }
@@ -458,12 +449,12 @@ export async function ingest(
       (k, v) => (streamTimestampPaths[k] = v),
       closeMongo,
    );
-   logger.debug("[ingest] Attached metadata handler");
+   logger.debug("Attached metadata handler");
 
    const memberCollection = db.collection<DataRecord>(database.data);
    await memberCollection.createIndex({id: 1});
    const indexCollection = db.collection<TREEFragment>(database.index);
-   await indexCollection.createIndex({ streamId: 1, id: 1 });
+   await indexCollection.createIndex({streamId: 1, id: 1});
 
 
    const pushMemberToDB = (record: SDSRecord, operations: AnyBulkWriteOperation<TREEFragment>[]) => {
@@ -500,7 +491,7 @@ export async function ingest(
 
       // Format member objects in preparation for storage writing
       const records = gatherRecords(data, streamTimestampPaths);
-      logger.debug(`[ingest] Handling ${records.length} record(s)`);
+      logger.debug(`Handling ${records.length} record(s)`);
 
       // Make sure duplicated members are skipped
       const updateData: DataRecord[] = [];
@@ -512,7 +503,7 @@ export async function ingest(
       if (updateData.length > 0) {
          // Do we really need to await this?
          await memberCollection.insertMany(updateData);
-         logger.debug(`[ingest] Inserted ${updateData.length} new members to the data collection`);
+         logger.debug(`Inserted ${updateData.length} new members to the data collection`);
       }
 
       // Update INDEX collection accordingly
@@ -532,5 +523,5 @@ export async function ingest(
       await indexCollection.bulkWrite(indexOperations);
    });
 
-   logger.debug("[ingest] Attached data handler");
+   logger.debug("Attached data handler");
 }
