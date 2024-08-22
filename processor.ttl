@@ -58,18 +58,6 @@ js:Ingest a js:JsProcess;
       a fnom:PositionParameterMapping;
       fnom:functionParameter "Database config";
       fnom:implementationParameterPosition "2"^^xsd:int;
-    ], [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Page Size";
-      fnom:implementationParameterPosition "3"^^xsd:int;
-    ], [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Branch Size";
-      fnom:implementationParameterPosition "4"^^xsd:int;
-    ], [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Min bucket span";
-      fnom:implementationParameterPosition "5"^^xsd:int;
     ];
   ].
 
@@ -93,23 +81,5 @@ js:Ingest a js:JsProcess;
     sh:minCount 1;
     sh:maxCount 1;
     sh:name "Database config";
-  ], [
-    sh:datatype xsd:integer;
-    sh:path js:pageSize;
-    sh:maxCount 1;
-    sh:defaultValue 100;
-    sh:name "Page Size";
-  ], [
-    sh:datatype xsd:integer;
-    sh:path js:branchSize;
-    sh:maxCount 1;
-    sh:defaultValue 4;
-    sh:name "Branch Size";
-  ], [
-    sh:datatype xsd:integer;
-    sh:path js:minBucketSpan;
-    sh:maxCount 1;
-    sh:defaultValue 300;
-    sh:name "Min bucket span";
   ].
 
