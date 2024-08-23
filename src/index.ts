@@ -9,47 +9,24 @@ import {
     SDS,
 } from "@treecg/types";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb";
-import { Parser, Writer } from "n3";
+import { DataFactory, Parser, Quad_Object, Writer } from "n3";
 import { env } from "process";
 import { TREEFragment } from "./fragmentHelper";
 import { getLoggerFor } from "./utils/logUtil";
+import { Extract, Extractor, RdfThing } from "./extractor";
+/* @ts-expect-error no type declaration available */
+import canonize from "rdf-canonize";
 
 const logger = getLoggerFor("ingest");
 
-type SDSRecord = {
-    stream: string;
-    payload: RDF.Term;
-    buckets: RDF.Term[];
-    timestampValue?: string;
-};
-
-export type DataRecord = {
-    id: string;
-    data: string;
-    timestamp: Date;
-};
-
-type Relation = {
-    type: RelationType;
-    value?: string;
-    bucket: string;
-    path?: string;
-};
-
-type Bucket = {
-    id: string;
-    root: boolean;
-    stream: string;
-    relations: Relation[];
-    immutable?: boolean;
-};
-
-export type DBConfig = {
-    url: string;
-    metadata: string;
-    data: string;
-    index: string;
-};
+function maybe_parse(data: RDF.Quad[] | string): RDF.Quad[] {
+    if (typeof data === "string" || data instanceof String) {
+        const parse = new Parser();
+        return parse.parse(<string>data);
+    } else {
+        return data;
+    }
+}
 
 type DenyQuad = (q: RDF.Quad, currentId: RDF.Term) => boolean;
 
@@ -92,174 +69,32 @@ function filterMember(
     return out;
 }
 
-function maybe_parse(data: RDF.Quad[] | string): RDF.Quad[] {
-    if (typeof data === "string" || data instanceof String) {
-        const parse = new Parser();
-        return parse.parse(<string>data);
-    } else {
-        return data;
-    }
-}
+export type DataRecord = {
+    id: string;
+    data: string;
+};
 
-function parseBool(bo?: string): boolean | undefined {
-    if (bo === undefined) {
-        return undefined;
-    } else if (!bo) {
-        return false;
-    } else {
-        const bos = bo.toLowerCase();
-        return bos === "t" || bos === "true" || bos === "1";
-    }
-}
+type Relation = {
+    type: RelationType;
+    value?: string;
+    bucket: string;
+    path?: string;
+};
 
-function gatherBuckets(data: RDF.Quad[]): Bucket[] {
-    const buckets: Bucket[] = [];
+type Bucket = {
+    id: string;
+    root: boolean;
+    stream: string;
+    relations: Relation[];
+    immutable?: boolean;
+};
 
-    const bucketTerms: Set<RDF.Term> = new Set();
-    data.filter(
-        (q) =>
-            q.predicate.equals(RDFT.terms.type) &&
-            q.object.equals(SDS.terms.custom("Bucket")) &&
-            q.graph.equals(SDS.terms.custom("DataDescription")),
-    )
-        .map((q) => q.subject)
-        .forEach((bucket) => bucketTerms.add(bucket));
-
-    data.filter(
-        (q) =>
-            q.predicate.equals(SDS.terms.bucket) &&
-            q.graph.equals(SDS.terms.custom("DataDescription")),
-    )
-        .map((q) => q.object)
-        .forEach((bucket) => bucketTerms.add(bucket));
-
-    bucketTerms.forEach((bucket) => {
-        const isRoot = data.find(
-            (q) =>
-                q.subject.equals(bucket) &&
-                q.predicate.equals(SDS.terms.custom("isRoot")),
-        )?.object.value;
-        const immutable = data.find(
-            (q) =>
-                q.subject.equals(bucket) &&
-                q.predicate.equals(SDS.terms.custom("immutable")),
-        )?.object.value;
-
-        // If the subject has a triple with the Stream, use that one. Otherwise, we need to find the stream via the record the bucket is attached to.
-        const stream =
-            data.find(
-                (q) =>
-                    q.subject.equals(bucket) &&
-                    q.predicate.equals(SDS.terms.stream),
-            )?.object.value ||
-            data.find(
-                (q) =>
-                    q.subject.equals(
-                        data.find(
-                            (record) =>
-                                record.predicate.equals(SDS.terms.bucket) &&
-                                record.object.equals(bucket),
-                        )?.subject,
-                    ) && q.predicate.equals(SDS.terms.stream),
-            )?.object.value;
-        if (!stream) {
-            logger.error(
-                `[gatherBuckets] Found SDS bucket without a stream! ${bucket.value}`,
-            );
-            return;
-        }
-
-        const b = {
-            root: isRoot === "true",
-            id: bucket.value,
-            relations: <Relation[]>[],
-            stream,
-            immutable: parseBool(immutable),
-        };
-
-        // Find all relations of the bucket
-        const relations = data
-            .filter(
-                (q) =>
-                    q.subject.equals(bucket) &&
-                    q.predicate.equals(SDS.terms.relation),
-            )
-            .map((x) => x.object);
-        for (const rel of relations) {
-            const relObj = data.filter((q) => q.subject.equals(rel));
-
-            const type = <RelationType>(
-                relObj.find((q) => q.predicate.equals(SDS.terms.relationType))!
-                    .object.value
-            );
-            const target = relObj.find((q) =>
-                q.predicate.equals(SDS.terms.relationBucket),
-            )!.object.value;
-            const path = relObj.find((q) =>
-                q.predicate.equals(SDS.terms.relationPath),
-            )?.object.value;
-            const value = relObj.find((q) =>
-                q.predicate.equals(SDS.terms.relationValue),
-            )?.object.value;
-
-            b.relations.push({ type, bucket: target, path, value });
-        }
-
-        buckets.push(b);
-    });
-    return buckets;
-}
-
-function gatherRecords(
-    data: RDF.Quad[],
-    timestampPaths: { [stream: string]: string },
-): SDSRecord[] {
-    const out: SDSRecord[] = [];
-
-    for (const recordId of data
-        .filter((q) => q.predicate.equals(SDS.terms.payload))
-        .map((x) => x.subject)) {
-        const stream = data.find(
-            (q) =>
-                q.subject.equals(recordId) &&
-                q.predicate.equals(SDS.terms.stream),
-        )?.object.value;
-        if (!stream) {
-            logger.error("[gatherRecords] Found SDS record without a stream!");
-            continue;
-        }
-        const payload = data.find(
-            (q) =>
-                q.subject.equals(recordId) &&
-                q.predicate.equals(SDS.terms.payload),
-        )!.object;
-        const buckets = data
-            .filter(
-                (q) =>
-                    q.subject.equals(recordId) &&
-                    q.predicate.equals(SDS.terms.bucket),
-            )
-            .map((x) => x.object);
-
-        const tPath = timestampPaths[stream];
-
-        const timestampValue = tPath
-            ? data.find(
-                  (q) =>
-                      q.subject.equals(payload) && q.predicate.value === tPath,
-              )?.object.value
-            : undefined;
-
-        out.push({
-            stream,
-            payload,
-            buckets,
-            timestampValue,
-        });
-    }
-
-    return out;
-}
+export type DBConfig = {
+    url: string;
+    metadata: string;
+    data: string;
+    index: string;
+};
 
 function emptyBuckets(
     data: RDF.Quad[],
@@ -290,75 +125,141 @@ function emptyBuckets(
     });
 }
 
-// This could be a memory problem in the long run
-// TODO: Find a way to persist written records efficiently
-//const addedMembers: Set<string> = new Set();
-async function addDataRecord(
-    updateRecords: DataRecord[],
-    record: SDSRecord,
-    quads: RDF.Quad[],
+async function handleRecords(
+    extract: Extract,
     collection: Collection<DataRecord>,
+    operations: AnyBulkWriteOperation<TREEFragment>[],
 ) {
-    const value = record.payload.value;
+    const dataSer = new Writer().quadsToString(extract.getData());
 
-    // Check if record has been registered in the local memory
-    //if (addedMembers.has(value)) return;
-    //addedMembers.add(value);
+    const records = extract.getRecords();
+    // only set the data if the id does not exist
+    const bulkUpdate: AnyBulkWriteOperation<DataRecord>[] = records.map(
+        (rec) => ({
+            updateOne: {
+                filter: {
+                    id: rec.payload,
+                },
+                update: {
+                    $setOnInsert: {
+                        data: dataSer,
+                    },
+                },
+                upsert: true,
+            },
+        }),
+    );
 
-    const member = filterMember(quads, record.payload, [
-        (q) => q.predicate.equals(SDS.terms.payload),
-    ]);
+    await collection.bulkWrite(bulkUpdate);
 
-    if (!member?.length) {
+    // Add this payload as a member to the correct buckets
+    for (const rec of records) {
+        for (const bucket of rec.buckets) {
+            operations.push({
+                updateOne: {
+                    filter: {
+                        streamId: rec.stream,
+                        id: bucket,
+                    },
+                    update: {
+                        $addToSet: { members: rec.payload },
+                    },
+                    upsert: true,
+                },
+            });
+        }
+    }
+}
+
+function handleBuckets(
+    extract: Extract,
+    operations: AnyBulkWriteOperation<TREEFragment>[],
+) {
+    const buckets = extract.getBuckets();
+
+    for (const bucket of buckets) {
+        const set: {
+            immutable?: boolean;
+            root?: boolean;
+            empty?: boolean;
+            members?: string[];
+        } = {};
+        if (bucket.root !== undefined) {
+            set.root = bucket.root;
+        }
+
+        if (bucket.empty !== undefined) {
+            set.empty = bucket.empty;
+            set.members = [];
+        }
+
+        if (bucket.immutable !== undefined) {
+            set.immutable = bucket.immutable;
+        }
+
+        operations.push({
+            updateOne: {
+                filter: {
+                    streamId: bucket.stream,
+                    id: bucket.id,
+                },
+                update: {
+                    $set: set,
+                },
+                upsert: true,
+            },
+        });
+    }
+}
+
+const df = DataFactory;
+async function pathString(thing?: RdfThing): Promise<string | undefined> {
+    if (!thing) {
         return;
     }
 
-    // Check if record is already written in the collection
-    const present =
-        (await collection.countDocuments({ id: value }, { limit: 1 })) > 0;
-    if (present) return;
-
-    const ser = new Writer().quadsToString(member);
-
-    updateRecords.push({
-        id: value,
-        data: ser,
-        timestamp: new Date(record.timestampValue!),
-    });
+    const quads = [
+        df.quad(
+            df.namedNode(""),
+            df.namedNode("http://purl.org/dc/terms/subject"),
+            <Quad_Object>thing.id,
+        ),
+        ...thing.quads,
+    ];
+    const canonical = await canonize.canonize(quads, { algorithm: "RDFC-1.0" });
+    return canonical;
 }
 
-const setRoots: Set<string> = new Set();
-const immutables: Set<string> = new Set();
-
-function addBucket(
-    bucket: Bucket,
+async function handleRelations(
+    extract: Extract,
     operations: AnyBulkWriteOperation<TREEFragment>[],
 ) {
-    const set: { immutable?: boolean; root?: boolean } = {};
-    // Handle root setting
-    if (bucket.root && !setRoots.has(bucket.stream)) {
-        setRoots.add(bucket.stream);
-        set.root = true;
-    }
+    const relations = extract.getRelations();
 
-    if (bucket.immutable && !immutables.has(bucket.id)) {
-        immutables.add(bucket.id);
-        set.immutable = true;
-    } else if (bucket.immutable === false) {
-        // If it is explicitly set as false, set it in the database, so we persist the bucket.
-        set.immutable = false;
-    }
+    for (const rel of relations) {
+        const pathValue = await pathString(rel.path);
+        const valueValue = await pathString(rel.value);
 
-    operations.push({
-        updateOne: {
-            filter: { streamId: bucket.stream, id: bucket.id },
-            update: {
-                $set: set,
-                $addToSet: { relations: { $each: bucket.relations } },
+        operations.push({
+            updateOne: {
+                filter: {
+                    streamId: rel.stream,
+                    id: rel.origin,
+                },
+                update: {
+                    $addToSet: {
+                        relations: {
+                            bucket: rel.bucket,
+                            path: pathValue,
+                            type: rel.type,
+                            value: valueValue,
+                        },
+                    },
+                },
+                upsert: true,
             },
-            upsert: true,
-        },
-    });
+        });
+    }
 }
 
 async function setup_metadata(
@@ -494,36 +395,7 @@ export async function ingest(
     const indexCollection = db.collection<TREEFragment>(database.index);
     await indexCollection.createIndex({ streamId: 1, id: 1 });
 
-    const pushMemberToDB = (
-        record: SDSRecord,
-        operations: AnyBulkWriteOperation<TREEFragment>[],
-    ) => {
-        const bs = record.buckets;
-        if (bs.length === 0) {
-            operations.push({
-                updateOne: {
-                    filter: { root: true, streamId: record.stream, id: "" },
-                    update: {
-                        $addToSet: { members: record.payload.value },
-                    },
-                    upsert: true,
-                },
-            });
-        } else {
-            operations.push({
-                updateMany: {
-                    filter: {
-                        streamId: record.stream,
-                        id: { $in: bs.map((b) => b.value) },
-                    },
-                    update: {
-                        $addToSet: { members: record.payload.value },
-                    },
-                    upsert: true,
-                },
-            });
-        }
-    };
+    const extractor = new Extractor();
 
     data.data(async (input: RDF.Quad[] | string) => {
         const data = maybe_parse(input);
@@ -532,38 +404,12 @@ export async function ingest(
             return;
         }
 
-        // Format member objects in preparation for storage writing
-        const records = gatherRecords(data, streamTimestampPaths);
-        logger.debug(`Handling ${records.length} record(s)`);
-
-        // Make sure duplicated members are skipped
-        const updateData: DataRecord[] = [];
-        for (const r of records) {
-            await addDataRecord(updateData, r, data, memberCollection);
-        }
-
-        // Write members to DATA collection
-        if (updateData.length > 0) {
-            // Do we really need to await this?
-            await memberCollection.insertMany(updateData);
-            logger.debug(
-                `Inserted ${updateData.length} new members to the data collection`,
-            );
-        }
-
-        // Update INDEX collection accordingly
+        const extract = extractor.extract_quads(data);
         const indexOperations: AnyBulkWriteOperation<TREEFragment>[] = [];
-        for (const r of records) {
-            pushMemberToDB(r, indexOperations);
-        }
 
-        const buckets: Bucket[] = gatherBuckets(data);
-        for (const bucket of buckets) {
-            addBucket(bucket, indexOperations);
-        }
-
-        // Empty buckets that are marked so.
-        emptyBuckets(data, indexOperations);
+        await handleRecords(extract, memberCollection, indexOperations);
+        handleBuckets(extract, indexOperations);
+        await handleRelations(extract, indexOperations);
 
         await indexCollection.bulkWrite(indexOperations);
     });
