@@ -224,7 +224,7 @@ async function pathString(thing?: RdfThing): Promise<string | undefined> {
             df.namedNode("http://purl.org/dc/terms/subject"),
             <Quad_Object>thing.id,
         ),
-        ...thing.quads,
+        ...thing.quads.map((x) => df.quad(x.subject, x.predicate, x.object)),
     ];
     const canonical = await canonize.canonize(quads, { algorithm: "RDFC-1.0" });
     return canonical;
