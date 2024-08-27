@@ -3,7 +3,7 @@ import { RDF as RDFT, RelationType, SDS } from "@treecg/types";
 import { Parser } from "n3";
 import { extractShapes, match, subject } from "rdf-lens";
 
-import { $INLINE_FILE } from "ts-transformer-inline-file";
+import { $INLINE_FILE } from "@ajuvercr/ts-transformer-inline-file";
 
 const Shapes = extractShapes(new Parser().parse($INLINE_FILE("./shape.ttl")));
 
@@ -70,15 +70,15 @@ export class Extract {
     }
 
     getRecords(): Record[] {
-        return RecordLens.execute(this.description);
+        return <Record[]>RecordLens.execute(this.description);
     }
 
     getBuckets(): Bucket[] {
-        return BucketLens.execute(this.description);
+        return <Bucket[]>BucketLens.execute(this.description);
     }
 
     getRelations(): Relation[] {
-        return RelationLens.execute(this.description);
+        return <Relation[]>RelationLens.execute(this.description);
     }
 }
 

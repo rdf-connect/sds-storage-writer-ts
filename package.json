@@ -4,7 +4,7 @@
   "description": "An RDF-Connect processor to write SDS streams into a given storage system",
   "main": "lib/index.js",
   "scripts": {
-    "build": "ttsc && tsc-alias",
+    "build": "tspc && tsc-alias",
     "test": "bun test --timeout 30000",
     "prepublishOnly": "tsc"
   },
@@ -26,6 +26,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
     "@jest/globals": "^29.7.0",
     "@rdfc/js-runner": "^0.2.1",
     "@types/n3": "^1.16.4",
@@ -39,16 +40,15 @@
     "mongodb-memory-server": "^9.3.0",
     "prettier": "^3.3.3",
     "ts-alias": "^0.0.7",
-    "ts-transformer-inline-file": "^0.2.0",
-    "ttypescript": "^1.5.15",
-    "typescript": "^4.9.4"
+    "ts-patch": "^3.2.1",
+    "typescript": "^5.5.4"
   },
   "dependencies": {
     "@treecg/types": "^0.4.6",
     "mongodb": "^6.8.0",
     "n3": "^1.17.3",
     "rdf-canonize": "^4.0.1",
-    "rdf-lens": "^1.2.8",
+    "rdf-lens": "^1.2.9",
     "winston": "^3.13.0"
   }
 }
