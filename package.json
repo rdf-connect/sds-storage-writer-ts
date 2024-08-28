@@ -28,9 +28,9 @@
   "devDependencies": {
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
     "@jest/globals": "^29.7.0",
-    "@rdfc/js-runner": "^0.2.2",
+    "@rdfc/js-runner": "^1.0.0-alpha.0",
     "@types/n3": "^1.16.5",
-    "@types/node": "^22.5.0",
+    "@types/node": "^22.5.1",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
     "eslint": "^9.9.1",
@@ -48,7 +48,7 @@
     "mongodb": "^6.8.0",
     "n3": "^1.21.0",
     "rdf-canonize": "^4.0.1",
-    "rdf-lens": "^1.2.9",
+    "rdf-lens": "^1.3.0",
     "winston": "^3.14.2"
   }
 }
