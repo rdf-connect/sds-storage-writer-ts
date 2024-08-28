@@ -1,6 +1,6 @@
 {
   "name": "@rdfc/sds-storage-writer-ts",
-  "version": "0.3.0-alpha.4",
+  "version": "1.0.0-alpha.0",
   "description": "An RDF-Connect processor to write SDS streams into a given storage system",
   "main": "lib/index.js",
   "scripts": {
