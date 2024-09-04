@@ -96,35 +96,6 @@ export type DBConfig = {
     index: string;
 };
 
-function emptyBuckets(
-    data: RDF.Quad[],
-    operations: AnyBulkWriteOperation<TREEFragment>[],
-) {
-    const bucketsToEmpty = data
-        .filter(
-            (q) =>
-                q.predicate.equals(SDS.terms.custom("empty")) &&
-                q.object.value === "true" &&
-                q.graph.equals(SDS.terms.custom("DataDescription")),
-        )
-        .map((q) => q.subject);
-
-    // Only perform the operation if there are buckets to empty.
-    if (bucketsToEmpty.length === 0) {
-        return;
-    }
-
-    operations.push({
-        updateMany: {
-            filter: { id: { $in: bucketsToEmpty.map((b) => b.value) } },
-            update: {
-                $set: { members: [] },
-            },
-            upsert: true,
-        },
-    });
-}
-
 async function handleRecords(
     extract: Extract,
     collection: Collection<DataRecord>,
@@ -403,6 +374,7 @@ export async function ingest(
             logger.error("Cannot handle data, mongo is closed");
             return;
         }
+        logger.debug(`Handling ingest for '${data.find((q) => q.predicate.equals(SDS.terms.payload))?.object?.value}'`);
 
         const extract = extractor.extract_quads(data);
         const indexOperations: AnyBulkWriteOperation<TREEFragment>[] = [];
