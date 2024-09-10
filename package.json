@@ -1,6 +1,6 @@
 {
   "name": "@rdfc/sds-storage-writer-ts",
-  "version": "1.0.0-alpha.0",
+  "version": "1.0.0-alpha.1",
   "description": "An RDF-Connect processor to write SDS streams into a given storage system",
   "main": "lib/index.js",
   "scripts": {
@@ -27,6 +27,8 @@
   "license": "MIT",
   "devDependencies": {
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.10.0",
     "@jest/globals": "^29.7.0",
     "@rdfc/js-runner": "^1.0.0-alpha.0",
     "@types/n3": "^1.16.5",
@@ -35,6 +37,7 @@
     "@typescript-eslint/parser": "^8.3.0",
     "eslint": "^9.9.1",
     "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.9.0",
     "husky": "^9.1.5",
     "lint-staged": "^15.2.9",
     "mongodb-memory-server": "^10.0.0",
@@ -45,6 +48,7 @@
   },
   "dependencies": {
     "@treecg/types": "^0.4.6",
+    "async-await-mutex-lock": "^1.0.11",
     "mongodb": "^6.8.0",
     "n3": "^1.21.0",
     "rdf-canonize": "^4.0.1",

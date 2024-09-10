@@ -16,6 +16,7 @@ import { getLoggerFor } from "./utils/logUtil";
 import { Extract, Extractor, RdfThing } from "./extractor";
 /* @ts-expect-error no type declaration available */
 import canonize from "rdf-canonize";
+import { Lock } from "async-await-mutex-lock";
 
 const logger = getLoggerFor("ingest");
 
@@ -124,7 +125,7 @@ function emptyBuckets(
         },
     });
 }
-
+const lock = new Lock();
 async function handleRecords(
     extract: Extract,
     collection: Collection<DataRecord>,
@@ -150,7 +151,12 @@ async function handleRecords(
         }),
     );
 
-    await collection.bulkWrite(bulkUpdate);
+    await lock.acquire("memberCollection");
+    try {
+        await collection.bulkWrite(bulkUpdate);
+    } finally {
+        lock.release("memberCollection");
+    }
 
     // Add this payload as a member to the correct buckets
     for (const rec of records) {
@@ -336,11 +342,17 @@ async function setup_metadata(
             }
 
             const ser = new Writer().quadsToString(streamMember);
-            await metaCollection.updateOne(
-                { type: SDS.Stream, id: streamId.value },
-                { $set: { value: ser } },
-                { upsert: true },
-            );
+
+            await lock.acquire("metaCollection");
+            try {
+                await metaCollection.updateOne(
+                    { type: SDS.Stream, id: streamId.value },
+                    { $set: { value: ser } },
+                    { upsert: true },
+                );
+            } finally {
+                lock.release("metaCollection");
+            }
         }
     };
 
@@ -411,7 +423,12 @@ export async function ingest(
         handleBuckets(extract, indexOperations);
         await handleRelations(extract, indexOperations);
 
-        await indexCollection.bulkWrite(indexOperations);
+        await lock.acquire("indexCollection");
+        try {
+            await indexCollection.bulkWrite(indexOperations);
+        } finally {
+            lock.release("indexCollection");
+        }
     });
 
     logger.debug("Attached data handler");
