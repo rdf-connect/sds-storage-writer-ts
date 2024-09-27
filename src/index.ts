@@ -1,22 +1,17 @@
 import type * as RDF from "@rdfjs/types";
 import { Stream } from "@rdfc/js-runner";
-import {
-    LDES,
-    Member,
-    PROV,
-    RDF as RDFT,
-    RelationType,
-    SDS,
-} from "@treecg/types";
-import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb";
+import { LDES, Member, PROV, RDF as RDFT, SDS } from "@treecg/types";
 import { DataFactory, Parser, Quad_Object, Writer } from "n3";
-import { env } from "process";
-import { TREEFragment } from "./fragmentHelper";
 import { getLoggerFor } from "./utils/logUtil";
 import { Extract, Extractor, RdfThing } from "./extractor";
 /* @ts-expect-error no type declaration available */
 import canonize from "rdf-canonize";
 import { Lock } from "async-await-mutex-lock";
+import {
+    getRepository,
+    IndexBulkOperations,
+    Repository,
+} from "./repositories/Repository";
 
 const logger = getLoggerFor("ingest");
 
@@ -83,60 +78,36 @@ export type DBConfig = {
 };
 
 const lock = new Lock();
+
 async function handleRecords(
     extract: Extract,
-    collection: Collection<DataRecord>,
-    operations: AnyBulkWriteOperation<TREEFragment>[],
+    repository: Repository,
+    operations: IndexBulkOperations,
 ) {
     const dataSer = new Writer().quadsToString(extract.getData());
 
     const records = extract.getRecords();
     // only set the data if the id does not exist
-    const bulkUpdate: AnyBulkWriteOperation<DataRecord>[] = records.map(
-        (rec) => ({
-            updateOne: {
-                filter: {
-                    id: rec.payload,
-                },
-                update: {
-                    $setOnInsert: {
-                        data: dataSer,
-                    },
-                },
-                upsert: true,
-            },
-        }),
-    );
+    const dataOperations = repository.prepareDataBulk();
 
-    await lock.acquire("memberCollection");
-    try {
-        await collection.bulkWrite(bulkUpdate);
-    } finally {
-        lock.release("memberCollection");
+    for (const rec of records) {
+        await repository.handleRecord(rec, dataSer, dataOperations);
     }
+
+    await repository.ingestDataBulk(dataOperations);
 
     // Add this payload as a member to the correct buckets
     for (const rec of records) {
         for (const bucket of rec.buckets) {
-            operations.push({
-                updateOne: {
-                    filter: {
-                        streamId: rec.stream,
-                        id: bucket,
-                    },
-                    update: {
-                        $addToSet: { members: rec.payload },
-                    },
-                    upsert: true,
-                },
-            });
+            await repository.handleMember(rec, bucket, operations);
         }
     }
 }
 
-function handleBuckets(
+async function handleBuckets(
     extract: Extract,
-    operations: AnyBulkWriteOperation<TREEFragment>[],
+    repository: Repository,
+    operations: IndexBulkOperations,
 ) {
     const buckets = extract.getBuckets();
 
@@ -160,22 +131,12 @@ function handleBuckets(
             set.immutable = bucket.immutable;
         }
 
-        operations.push({
-            updateOne: {
-                filter: {
-                    streamId: bucket.stream,
-                    id: bucket.id,
-                },
-                update: {
-                    $set: set,
-                },
-                upsert: true,
-            },
-        });
+        await repository.handleBucket(bucket, set, operations);
     }
 }
 
 const df = DataFactory;
+
 async function pathString(thing?: RdfThing): Promise<string | undefined> {
     if (!thing) {
         return;
@@ -195,7 +156,8 @@ async function pathString(thing?: RdfThing): Promise<string | undefined> {
 
 async function handleRelations(
     extract: Extract,
-    operations: AnyBulkWriteOperation<TREEFragment>[],
+    repository: Repository,
+    operations: IndexBulkOperations,
 ) {
     const relations = extract.getRelations();
 
@@ -203,31 +165,13 @@ async function handleRelations(
         const pathValue = await pathString(rel.path);
         const valueValue = await pathString(rel.value);
 
-        operations.push({
-            updateOne: {
-                filter: {
-                    streamId: rel.stream,
-                    id: rel.origin,
-                },
-                update: {
-                    $addToSet: {
-                        relations: {
-                            bucket: rel.bucket,
-                            path: pathValue,
-                            type: rel.type,
-                            value: valueValue,
-                        },
-                    },
-                },
-                upsert: true,
-            },
-        });
+        await repository.handleRelation(rel, pathValue, valueValue, operations);
     }
 }
 
 async function setup_metadata(
     metadata: Stream<string | RDF.Quad[]>,
-    metaCollection: Collection,
+    repository: Repository,
     setTimestamp: (stream: string, value: string) => void,
     onClose: () => void,
 ) {
@@ -238,17 +182,8 @@ async function setup_metadata(
         return onClose();
     });
 
-    const dbFragmentations: Member[] = await metaCollection
-        .find({
-            type: "fragmentation",
-        })
-        .map((entry) => {
-            return {
-                id: entry.id,
-                quads: new Parser().parse(entry.value),
-            };
-        })
-        .toArray();
+    const dbFragmentations: Member[] =
+        await repository.findMetadataFragmentations();
 
     logger.debug(
         `[setup_metadata] Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
@@ -260,7 +195,7 @@ async function setup_metadata(
         meta = maybe_parse(meta);
         if (!ingestMetadata) {
             logger.error(
-                "[setup_metadata] Cannot handle metadata, mongo is closed",
+                "[setup_metadata] Cannot handle metadata, repository is closed",
             );
             return;
         }
@@ -300,16 +235,7 @@ async function setup_metadata(
 
             const ser = new Writer().quadsToString(streamMember);
 
-            await lock.acquire("metaCollection");
-            try {
-                await metaCollection.updateOne(
-                    { type: SDS.Stream, id: streamId.value },
-                    { $set: { value: ser } },
-                    { upsert: true },
-                );
-            } finally {
-                lock.release("metaCollection");
-            }
+            await repository.ingestMetadata(SDS.Stream, streamId.value, ser);
         }
     };
 
@@ -325,12 +251,8 @@ export async function ingest(
     metadata: Stream<string | RDF.Quad[]>,
     database: DBConfig,
 ) {
-    const url =
-        database.url || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
-    const mongo = await new MongoClient(url).connect();
-    const db = mongo.db();
-
-    logger.debug(`Connected to ${url}`);
+    const repository = getRepository(database);
+    await repository.open();
 
     const streamTimestampPaths: { [streamId: string]: string } = {};
 
@@ -338,38 +260,35 @@ export async function ingest(
     let ingestData = true;
     let closed = false;
 
-    const closeMongo = () => {
+    const closeRepository = () => {
         if (!ingestMetadata && !ingestData && !closed) {
-            logger.info("Closing MongoDB client connection");
+            logger.info("Closing repository client connection");
             closed = true;
-            return mongo.close();
+            return repository.close();
         }
     };
 
-    data.on("end", () => {
+    data.on("end", async () => {
         ingestData = false;
-        return closeMongo();
+        return await closeRepository();
     });
 
     await setup_metadata(
         metadata,
-        db.collection(database.metadata),
+        repository,
         (k, v) => (streamTimestampPaths[k] = v),
-        closeMongo,
+        closeRepository,
     );
     logger.debug("Attached metadata handler");
 
-    const memberCollection = db.collection<DataRecord>(database.data);
-    await memberCollection.createIndex({ id: 1 });
-    const indexCollection = db.collection<TREEFragment>(database.index);
-    await indexCollection.createIndex({ streamId: 1, id: 1 });
+    await repository.createIndices();
 
     const extractor = new Extractor();
 
     data.data(async (input: RDF.Quad[] | string) => {
         const data = maybe_parse(input);
         if (!ingestData) {
-            logger.error("Cannot handle data, mongo is closed");
+            logger.error("Cannot handle data, repository is closed");
             return;
         }
         logger.debug(
@@ -377,18 +296,14 @@ export async function ingest(
         );
 
         const extract = extractor.extract_quads(data);
-        const indexOperations: AnyBulkWriteOperation<TREEFragment>[] = [];
+        const indexOperations: IndexBulkOperations =
+            repository.prepareIndexBulk();
 
-        await handleRecords(extract, memberCollection, indexOperations);
-        handleBuckets(extract, indexOperations);
-        await handleRelations(extract, indexOperations);
+        await handleRecords(extract, repository, indexOperations);
+        await handleBuckets(extract, repository, indexOperations);
+        await handleRelations(extract, repository, indexOperations);
 
-        await lock.acquire("indexCollection");
-        try {
-            await indexCollection.bulkWrite(indexOperations);
-        } finally {
-            lock.release("indexCollection");
-        }
+        await repository.ingestIndexBulk(indexOperations);
     });
 
     logger.debug("Attached data handler");
