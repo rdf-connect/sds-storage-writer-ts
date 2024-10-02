@@ -5,10 +5,15 @@ import { Member } from "@treecg/types";
 import { AnyBulkWriteOperation } from "mongodb";
 import { TREEFragment } from "../fragmentHelper";
 import { Bucket, Record, Relation } from "../extractor";
+import { RedisRepository } from "./RedisRepository";
 
-export type DataBulkOperations = AnyBulkWriteOperation<DataRecord>[];
+export type DataBulkOperations =
+    | AnyBulkWriteOperation<DataRecord>[]
+    | Promise<string | null>[];
 
-export type IndexBulkOperations = AnyBulkWriteOperation<TREEFragment>[];
+export type IndexBulkOperations =
+    | AnyBulkWriteOperation<TREEFragment>[]
+    | Promise<string | number | null>[];
 
 export interface Repository {
     open(): Promise<void>;
@@ -61,6 +66,13 @@ export function getRepository(dbConfig: DBConfig): Repository {
 
     if (url.startsWith("mongodb://")) {
         return new MongoDBRepository(
+            url,
+            dbConfig.metadata,
+            dbConfig.data,
+            dbConfig.index,
+        );
+    } else if (url.startsWith("redis://")) {
+        return new RedisRepository(
             url,
             dbConfig.metadata,
             dbConfig.data,
