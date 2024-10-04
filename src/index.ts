@@ -300,8 +300,8 @@ export async function ingest(
             repository.prepareIndexBulk();
 
         await handleRecords(extract, repository, indexOperations);
-        await handleBuckets(extract, repository, indexOperations);
         await handleRelations(extract, repository, indexOperations);
+        await handleBuckets(extract, repository, indexOperations);
 
         await repository.ingestIndexBulk(indexOperations);
     });
