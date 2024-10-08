@@ -24,6 +24,12 @@
     sh:name "buckets";
     sh:path sds:bucket;
     sh:datatype xsd:string;
+  ], [
+    sh:name "dataless";
+    sh:path sds:dataless;
+    sh:datatype xsd:boolean;
+    sh:minCount 0;
+    sh:maxCount 1;
   ].
 
 [ ] a sh:NodeShape;

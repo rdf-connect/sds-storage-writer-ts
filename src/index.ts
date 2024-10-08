@@ -91,7 +91,9 @@ async function handleRecords(
     const dataOperations = repository.prepareDataBulk();
 
     for (const rec of records) {
-        await repository.handleRecord(rec, dataSer, dataOperations);
+        if (!rec.dataless) {
+            await repository.handleRecord(rec, dataSer, dataOperations);
+        }
     }
 
     await repository.ingestDataBulk(dataOperations);
