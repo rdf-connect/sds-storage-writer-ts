@@ -11,11 +11,12 @@ export type Record = {
     stream: string;
     payload: string;
     buckets: string[];
+    dataless?: boolean;
 };
 
 export type Bucket = {
     id: string;
-    stream: string;
+    streamId: string;
     immutable?: boolean;
     root?: boolean;
     empty?: boolean;

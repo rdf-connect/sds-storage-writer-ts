@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { Extractor } from "../lib/extractor";
 
 describe("SDS storage writer tests", () => {
@@ -107,7 +107,7 @@ _:n3-26 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://qudt.org/1.1/
 
         const buckets = extract.getBuckets();
         expect(buckets.length).toBe(4);
-        expect(buckets.map((x) => x.stream)).toEqual([
+        expect(buckets.map((x) => x.streamId)).toEqual([
             "https://example.org/ns#",
             "https://example.org/ns#",
             "https://example.org/ns#",
