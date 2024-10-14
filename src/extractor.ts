@@ -16,7 +16,7 @@ export type Record = {
 
 export type Bucket = {
     id: string;
-    stream: string;
+    streamId: string;
     immutable?: boolean;
     root?: boolean;
     empty?: boolean;

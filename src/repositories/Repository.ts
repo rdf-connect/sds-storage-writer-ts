@@ -48,7 +48,6 @@ export interface Repository {
 
     handleBucket(
         bucket: Bucket,
-        parameters: any,
         bulk: IndexBulkOperations,
     ): Promise<void>;
 
@@ -64,14 +63,14 @@ export function getRepository(dbConfig: DBConfig): Repository {
     const url =
         dbConfig.url || env.DB_CONN_STRING || "mongodb://localhost:27017/ldes";
 
-    if (url.startsWith("mongodb://")) {
+    if (url.startsWith("mongodb")) {
         return new MongoDBRepository(
             url,
             dbConfig.metadata,
             dbConfig.data,
             dbConfig.index,
         );
-    } else if (url.startsWith("redis://")) {
+    } else if (url.startsWith("redis")) {
         return new RedisRepository(
             url,
             dbConfig.metadata,

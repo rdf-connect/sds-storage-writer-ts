@@ -114,26 +114,7 @@ async function handleBuckets(
     const buckets = extract.getBuckets();
 
     for (const bucket of buckets) {
-        const set: {
-            immutable?: boolean;
-            root?: boolean;
-            empty?: boolean;
-            members?: string[];
-        } = {};
-        if (bucket.root !== undefined) {
-            set.root = bucket.root;
-        }
-
-        if (bucket.empty !== undefined) {
-            set.empty = bucket.empty;
-            set.members = [];
-        }
-
-        if (bucket.immutable !== undefined) {
-            set.immutable = bucket.immutable;
-        }
-
-        await repository.handleBucket(bucket, set, operations);
+        await repository.handleBucket(bucket, operations);
     }
 }
 

@@ -120,31 +120,22 @@ export class RedisRepository implements Repository {
 
     async handleBucket(
         bucket: Bucket,
-        parameters: any,
         bulk: Promise<string | number | null>[],
     ): Promise<void> {
-        // If parameters contains `members`, use the handleMember method and remove the key.
-        if (parameters.members || parameters.empty) {
+        // If bucket contains `empty`, remove the members set
+        if (bucket.empty) {
             bulk.push(
                 this.client.del(
-                    `${this.index}:${encodeURIComponent(bucket.stream)}:${encodeURIComponent(bucket.id)}:members`,
+                    `${this.index}:${encodeURIComponent(bucket.streamId)}:${encodeURIComponent(bucket.id)}:members`,
                 ),
             );
-            for (const member of parameters.members) {
-                await this.handleMember(member, bucket.id, bulk);
-            }
-            delete parameters.members;
         }
-
-        // Set streamId and id parameters
-        parameters.streamId = bucket.stream;
-        parameters.id = bucket.id;
 
         bulk.push(
             this.client.json.set(
-                `${this.index}:${encodeURIComponent(bucket.stream)}:${encodeURIComponent(bucket.id)}`,
+                `${this.index}:${encodeURIComponent(bucket.streamId)}:${encodeURIComponent(bucket.id)}`,
                 ".",
-                parameters,
+                bucket,
             ),
         );
     }

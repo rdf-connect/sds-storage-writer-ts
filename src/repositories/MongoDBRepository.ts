@@ -148,17 +148,20 @@ export class MongoDBRepository implements Repository {
 
     async handleBucket(
         bucket: Bucket,
-        parameters: any,
         bulk: AnyBulkWriteOperation<TREEFragment>[],
     ): Promise<void> {
+        if (bucket.empty) {
+            (bucket as TREEFragment).members = [];
+            delete bucket.empty;
+        }
         bulk.push({
             updateOne: {
                 filter: {
-                    streamId: bucket.stream,
+                    streamId: bucket.streamId,
                     id: bucket.id,
                 },
                 update: {
-                    $set: parameters,
+                    $set: bucket,
                 },
                 upsert: true,
             },
