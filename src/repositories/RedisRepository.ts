@@ -131,6 +131,8 @@ export class RedisRepository implements Repository {
             );
         }
 
+        delete bucket.empty;
+
         bulk.push(
             this.client.json.set(
                 `${this.index}:${encodeURIComponent(bucket.streamId)}:${encodeURIComponent(bucket.id)}`,

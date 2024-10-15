@@ -152,8 +152,9 @@ export class MongoDBRepository implements Repository {
     ): Promise<void> {
         if (bucket.empty) {
             (bucket as TREEFragment).members = [];
-            delete bucket.empty;
         }
+        delete bucket.empty;
+
         bulk.push({
             updateOne: {
                 filter: {
