@@ -114,6 +114,12 @@ async function handleBuckets(
     const buckets = extract.getBuckets();
 
     for (const bucket of buckets) {
+        if (!bucket.root) {
+            delete bucket.root;
+        }
+        if (!bucket.immutable) {
+            delete bucket.immutable;
+        }
         await repository.handleBucket(bucket, operations);
     }
 }
