@@ -140,6 +140,12 @@ export class MongoDBRepository implements Repository {
                 },
                 update: {
                     $addToSet: { members: record.payload },
+                    $set: {
+                        updated: Date.now(),
+                    },
+                    $setOnInsert: {
+                        created: Date.now(),
+                    },
                 },
                 upsert: true,
             },
@@ -162,7 +168,10 @@ export class MongoDBRepository implements Repository {
                     id: bucket.id,
                 },
                 update: {
-                    $set: bucket,
+                    $set: { ...bucket, updated: Date.now() },
+                    $setOnInsert: {
+                        created: Date.now(),
+                    },
                 },
                 upsert: true,
             },
@@ -189,6 +198,12 @@ export class MongoDBRepository implements Repository {
                             type: relation.type,
                             value: value,
                         },
+                    },
+                    $set: {
+                        updated: Date.now(),
+                    },
+                    $setOnInsert: {
+                        created: Date.now(),
                     },
                 },
                 upsert: true,

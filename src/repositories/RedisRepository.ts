@@ -111,6 +111,14 @@ export class RedisRepository implements Repository {
         bulk: Promise<string | number | null>[],
     ): Promise<void> {
         bulk.push(
+            this.client.json.set(
+                `${this.index}:${encodeURIComponent(record.stream)}:${encodeURIComponent(bucket)}`,
+                "$.updated",
+                Date.now(),
+                { XX: true },
+            ),
+        );
+        bulk.push(
             this.client.sAdd(
                 `${this.index}:${encodeURIComponent(record.stream)}:${encodeURIComponent(bucket)}:members`,
                 record.payload,
@@ -133,11 +141,20 @@ export class RedisRepository implements Repository {
 
         delete bucket.empty;
 
+        // Make sure the key exists to then use JSON.MERGE, and initialize the key with the created timestamp.
         bulk.push(
             this.client.json.set(
                 `${this.index}:${encodeURIComponent(bucket.streamId)}:${encodeURIComponent(bucket.id)}`,
-                ".",
-                bucket,
+                "$",
+                { created: Date.now() },
+                { NX: true },
+            ),
+        );
+        bulk.push(
+            this.client.json.merge(
+                `${this.index}:${encodeURIComponent(bucket.streamId)}:${encodeURIComponent(bucket.id)}`,
+                "$",
+                { updated: Date.now(), ...bucket },
             ),
         );
     }
@@ -148,6 +165,14 @@ export class RedisRepository implements Repository {
         value: string | undefined,
         bulk: Promise<string | number | null>[],
     ): Promise<void> {
+        bulk.push(
+            this.client.json.set(
+                `${this.index}:${encodeURIComponent(relation.stream)}:${encodeURIComponent(relation.origin)}`,
+                "$.updated",
+                Date.now(),
+                { XX: true },
+            ),
+        );
         bulk.push(
             this.client.sAdd(
                 `${this.index}:${encodeURIComponent(relation.stream)}:${encodeURIComponent(relation.origin)}:relations`,
