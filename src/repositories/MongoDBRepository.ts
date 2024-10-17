@@ -105,6 +105,7 @@ export class MongoDBRepository implements Repository {
                 update: {
                     $setOnInsert: {
                         data: data,
+                        created: Date.now(),
                     },
                 },
                 upsert: true,
