@@ -92,6 +92,10 @@ export class RedisRepository implements Repository {
                 `${this.data}:${encodeURIComponent(record.payload)}`,
                 data,
             ),
+            this.client.set(
+                `${this.data}:${encodeURIComponent(record.payload)}:created`,
+                Date.now(),
+            ),
         );
     }
 
