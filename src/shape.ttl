@@ -108,7 +108,7 @@
     sh:path ( );
     sh:maxCount 1;
     sh:minCount 1;
-    sh:datatype xsd:iri;
+    sh:datatype xsd:any;
   ], [
     sh:name "quads";
     sh:path ( );
