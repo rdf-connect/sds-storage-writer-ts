@@ -5,7 +5,8 @@ import { createClient, RedisClientType } from "redis";
 import { Member } from "@treecg/types";
 import { DataFactory, Parser } from "n3";
 import { Bucket, Record, Relation } from "../extractor";
-import namedNode = DataFactory.namedNode;
+
+const { namedNode } = DataFactory;
 
 export class RedisRepository implements Repository {
     protected url: string;
