@@ -158,80 +158,39 @@ async function handleRelations(
     }
 }
 
-async function setup_metadata(
-    metadata: Stream<string | RDF.Quad[]>,
+async function handleMetadata(
+    metadata: string | RDF.Quad[],
     repository: Repository,
-    setTimestamp: (stream: string, value: string) => void,
-    onClose: () => void,
+    ingestMetadata: boolean
 ) {
-    let ingestMetadata = true;
+    const meta = maybe_parse(metadata);
+    if (!ingestMetadata) {
+        logger.error(
+            "[setup_metadata] Cannot handle metadata, repository is closed",
+        );
+        return;
+    }
 
-    metadata.on("end", () => {
-        ingestMetadata = false;
-        return onClose();
-    });
+    const streams = meta
+        .filter(
+            (q) =>
+                q.predicate.equals(RDFT.terms.type) &&
+                q.object.equals(SDS.terms.Stream),
+        )
+        .map((q) => q.subject);
 
-    const dbFragmentations: Member[] =
-        await repository.findMetadataFragmentations();
+    for (const streamId of streams) {
+        const streamMember = filterMember(meta, streamId, [
+            (q, id) =>
+                q.predicate.equals(PROV.terms.used) && q.object.equals(id),
+            (q, id) =>
+                q.predicate.equals(SDS.terms.dataset) &&
+                q.object.equals(id),
+        ]);
 
-    logger.debug(
-        `[setup_metadata] Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
-            (x) => x.id.value,
-        )})`,
-    );
+        const ser = new Writer().quadsToString(streamMember);
 
-    const handleMetadata = async (meta: string | RDF.Quad[]) => {
-        meta = maybe_parse(meta);
-        if (!ingestMetadata) {
-            logger.error(
-                "[setup_metadata] Cannot handle metadata, repository is closed",
-            );
-            return;
-        }
-
-        const streams = meta
-            .filter(
-                (q) =>
-                    q.predicate.equals(RDFT.terms.type) &&
-                    q.object.equals(SDS.terms.Stream),
-            )
-            .map((q) => q.subject);
-
-        for (const streamId of streams) {
-            const streamMember = filterMember(meta, streamId, [
-                (q, id) =>
-                    q.predicate.equals(PROV.terms.used) && q.object.equals(id),
-                (q, id) =>
-                    q.predicate.equals(SDS.terms.dataset) &&
-                    q.object.equals(id),
-            ]);
-
-            const datasetId = streamMember.find(
-                (q) =>
-                    q.subject.equals(streamId) &&
-                    q.predicate.equals(SDS.terms.dataset),
-            )?.object;
-            if (datasetId) {
-                const timestampPathObject = streamMember.find(
-                    (q) =>
-                        q.subject.equals(datasetId) &&
-                        q.predicate.equals(LDES.terms.timestampPath),
-                )?.object;
-                if (timestampPathObject) {
-                    setTimestamp(streamId.value, timestampPathObject.value);
-                }
-            }
-
-            const ser = new Writer().quadsToString(streamMember);
-
-            await repository.ingestMetadata(SDS.Stream, streamId.value, ser);
-        }
-    };
-
-    metadata.data(handleMetadata);
-
-    if (metadata.lastElement) {
-        await handleMetadata(metadata.lastElement);
+        await repository.ingestMetadata(SDS.Stream, streamId.value, ser);
     }
 }
 
@@ -243,9 +202,16 @@ export async function ingest(
     const repository = getRepository(database);
     await repository.open();
 
-    const streamTimestampPaths: { [streamId: string]: string } = {};
+    const dbFragmentations: Member[] =
+        await repository.findMetadataFragmentations();
 
-    const ingestMetadata = true;
+    logger.debug(
+        `Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
+            (x) => x.id.value,
+        )})`,
+    );
+
+    let ingestMetadata = true;
     let ingestData = true;
     let closed = false;
 
@@ -262,12 +228,16 @@ export async function ingest(
         return await closeRepository();
     });
 
-    await setup_metadata(
-        metadata,
-        repository,
-        (k, v) => (streamTimestampPaths[k] = v),
-        closeRepository,
-    );
+    metadata.on("end", async () => {
+        ingestMetadata = false;
+        return await closeRepository();
+    });
+
+    metadata.data(async (meta) => await handleMetadata(meta, repository, ingestMetadata));
+
+    if (metadata.lastElement) {
+        await handleMetadata(metadata.lastElement, repository, ingestMetadata);
+    }
     logger.debug("Attached metadata handler");
 
     await repository.createIndices();
