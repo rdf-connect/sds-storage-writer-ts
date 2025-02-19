@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tspc && tsc-alias",
     "test": "vitest run --coverage --coverage.include src",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "npm run build"
   },
   "files": [
     "lib/**/*",
