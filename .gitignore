@@ -1,4 +1,4 @@
 lib/
 __tests__/*.js
 node_modules
-
+coverage
