@@ -57,6 +57,13 @@ export interface Repository {
         value: string | undefined,
         bulk: IndexBulkOperations,
     ): Promise<void>;
+
+    removeRelation(
+        relation: Relation,
+        path: string | undefined,
+        value: string | undefined,
+        bulk: IndexBulkOperations,
+    ): Promise<void>;
 }
 
 export function getRepository(dbConfig: DBConfig): Repository {

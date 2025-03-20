@@ -54,11 +54,16 @@ const RelationLens = match(
 export class Extract {
     private data: RDF.Quad[] = [];
     private description: RDF.Quad[] = [];
+    private removeDescription: RDF.Quad[] = [];
 
     constructor(full: RDF.Quad[]) {
         full.forEach((q) => {
             if (q.graph.equals(SDS.terms.custom("DataDescription"))) {
                 this.description.push(q);
+            } else if (
+                q.graph.equals(SDS.terms.custom("RemoveDataDescription"))
+            ) {
+                this.removeDescription.push(q);
             } else {
                 this.data.push(q);
             }
@@ -79,6 +84,10 @@ export class Extract {
 
     getRelations(): Relation[] {
         return <Relation[]>RelationLens.execute(this.description);
+    }
+
+    getRemoveRelations(): Relation[] {
+        return <Relation[]>RelationLens.execute(this.removeDescription);
     }
 }
 
