@@ -148,6 +148,17 @@ async function handleRelations(
     repository: Repository,
     operations: IndexBulkOperations,
 ) {
+    // Remove old relations
+    const removeRelations = extract.getRemoveRelations();
+
+    for (const rel of removeRelations) {
+        const pathValue = await pathString(rel.path);
+        const valueValue = await pathString(rel.value);
+
+        await repository.removeRelation(rel, pathValue, valueValue, operations);
+    }
+
+    // Add new relations
     const relations = extract.getRelations();
 
     for (const rel of relations) {

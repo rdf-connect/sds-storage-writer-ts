@@ -2,7 +2,7 @@ import { Repository } from "./Repository";
 import { AnyBulkWriteOperation, Db, MongoClient } from "mongodb";
 import { getLoggerFor } from "../utils/logUtil";
 import { Lock } from "async-await-mutex-lock";
-import { Member } from "@treecg/types";
+import { Member, RelationType } from "@treecg/types";
 import { Parser } from "n3";
 import { TREEFragment } from "../fragmentHelper";
 import { DataRecord } from "../index";
@@ -208,6 +208,47 @@ export class MongoDBRepository implements Repository {
                     },
                 },
                 upsert: true,
+            },
+        });
+    }
+
+    async removeRelation(
+        relation: Relation,
+        path: string | undefined,
+        value: string | undefined,
+        bulk: AnyBulkWriteOperation<TREEFragment>[],
+    ): Promise<void> {
+        const matchCriteria: Partial<{
+            bucket: string;
+            type: RelationType;
+            path: string;
+            value: string;
+        }> = {
+            bucket: relation.bucket,
+            type: relation.type,
+        };
+
+        if (path !== undefined) {
+            matchCriteria.path = path;
+        }
+        if (value !== undefined) {
+            matchCriteria.value = value;
+        }
+
+        bulk.push({
+            updateOne: {
+                filter: {
+                    streamId: relation.stream,
+                    id: relation.origin,
+                },
+                update: {
+                    $pull: {
+                        relations: matchCriteria,
+                    },
+                    $set: {
+                        updated: Date.now(),
+                    },
+                },
             },
         });
     }

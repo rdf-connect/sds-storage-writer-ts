@@ -192,4 +192,47 @@ export class RedisRepository implements Repository {
             ),
         );
     }
+
+    async removeRelation(
+        relation: Relation,
+        path: string | undefined,
+        value: string | undefined,
+        bulk: Promise<string | number | null>[],
+    ): Promise<void> {
+        const key = `${this.index}:${encodeURIComponent(relation.stream)}:${encodeURIComponent(relation.origin)}:relations`;
+
+        // Fetch existing relations
+        const existingRelations = await this.client.sMembers(key);
+        if (!existingRelations || existingRelations.length === 0) {
+            return;
+        }
+
+        // Filter out the relation that should be removed
+        for (const rel of existingRelations) {
+            try {
+                const parsedRel = JSON.parse(rel);
+                if (
+                    parsedRel.type === relation.type &&
+                    parsedRel.bucket === relation.bucket &&
+                    (path === undefined || parsedRel.path === path) &&
+                    (value === undefined || parsedRel.value === value)
+                ) {
+                    bulk.push(this.client.sRem(key, rel));
+                }
+            } catch (error) {
+                this.logger.error(`Failed to parse relation: ${rel}`);
+                this.logger.debug(error);
+            }
+        }
+
+        // Update the 'updated' timestamp
+        bulk.push(
+            this.client.json.set(
+                `${this.index}:${encodeURIComponent(relation.stream)}:${encodeURIComponent(relation.origin)}`,
+                "$.updated",
+                Date.now(),
+                { XX: true },
+            ),
+        );
+    }
 }
