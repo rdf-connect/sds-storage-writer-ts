@@ -31,7 +31,7 @@
   "devDependencies": {
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
     "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.28.0",
+    "@eslint/js": "^9.29.0",
     "@rdfc/js-runner": "^1.0.0",
     "@types/n3": "^1.26.0",
     "@types/node": "^22.15.31",
