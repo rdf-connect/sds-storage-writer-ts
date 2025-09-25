@@ -25,7 +25,8 @@
   "contributors": [
     "Julián Rojas",
     "Pieter Colpaert",
-    "Ieben Smessaert"
+    "Ieben Smessaert",
+    "Ruben Dedecker"
   ],
   "license": "MIT",
   "devDependencies": {
