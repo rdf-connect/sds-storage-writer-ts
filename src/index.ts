@@ -1,7 +1,7 @@
 import type * as RDF from "@rdfjs/types";
-import { Stream } from "@rdfc/js-runner";
+import { Processor, type Reader, type Writer } from "@rdfc/js-runner";
 import { LDES, Member, PROV, RDF as RDFT, SDS } from "@treecg/types";
-import { DataFactory, Parser, Quad_Object, Writer } from "n3";
+import { DataFactory, Parser, Quad_Object, Writer as N3Writer } from "n3";
 import { getLoggerFor } from "./utils/logUtil";
 import { Extract, Extractor, RdfThing } from "./extractor";
 /* @ts-expect-error no type declaration available */
@@ -12,6 +12,7 @@ import {
     IndexBulkOperations,
     Repository,
 } from "./repositories/Repository";
+
 
 const logger = getLoggerFor("ingest");
 
@@ -84,7 +85,7 @@ async function handleRecords(
     repository: Repository,
     operations: IndexBulkOperations,
 ) {
-    const dataSer = new Writer().quadsToString(extract.getData());
+    const dataSer = new N3Writer().quadsToString(extract.getData());
 
     const records = extract.getRecords();
     // only set the data if the id does not exist
@@ -199,28 +200,48 @@ async function handleMetadata(
                 q.object.equals(id),
         ]);
 
-        const ser = new Writer().quadsToString(streamMember);
+        const ser = new N3Writer().quadsToString(streamMember);
 
         await repository.ingestMetadata(SDS.Stream, streamId.value, ser);
     }
 }
 
+
 export async function ingest(
-    data: Stream<string | RDF.Quad[]>,
-    metadata: Stream<string | RDF.Quad[]>,
+    data: Reader,
+    metadata: Reader,
     database: DBConfig,
 ) {
+    const repository = await (ingestInit(data, metadata, database))
+    await (ingestTransform(data, metadata, repository))
+}
+
+async function ingestInit(
+    data: Reader,
+    metadata: Reader,
+    database: DBConfig,) 
+{
     const repository = getRepository(database);
     await repository.open();
 
-    const dbFragmentations: Member[] =
-        await repository.findMetadataFragmentations();
-
+    const dbFragmentations: Promise<Member[]> = repository.findMetadataFragmentations();
+    dbFragmentations.then(frag => 
     logger.debug(
-        `Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
-            (x) => x.id.value,
-        )})`,
-    );
+            `Found ${frag.length} fragmentations (${frag.map(
+                (x) => x.id.value,
+            )})`,
+        )
+    )
+
+    await repository.createIndices();
+    return repository
+}
+
+function ingestTransform(
+    data: Reader,
+    metadata: Reader,
+    repository: Repository
+) {
 
     let ingestMetadata = true;
     let ingestData = true;
@@ -234,47 +255,75 @@ export async function ingest(
         }
     };
 
-    data.on("end", async () => {
-        ingestData = false;
-        return await closeRepository();
-    });
-
-    metadata.on("end", async () => {
-        ingestMetadata = false;
-        return await closeRepository();
-    });
-
-    metadata.data(async (meta) => await handleMetadata(meta, repository, ingestMetadata));
-
-    if (metadata.lastElement) {
-        await handleMetadata(metadata.lastElement, repository, ingestMetadata);
-    }
-    logger.debug("Attached metadata handler");
-
-    await repository.createIndices();
-
     const extractor = new Extractor();
 
-    data.data(async (input: RDF.Quad[] | string) => {
-        const data = maybe_parse(input);
-        if (!ingestData) {
-            logger.error("Cannot handle data, repository is closed");
-            return;
+    // Helper to process one iterator
+    const processDataIterator = async (iter: any) => {
+        for await (const item of iter) {
+            const data = maybe_parse(item);
+            if (!ingestData) {
+                logger.error("Cannot handle data, repository is closed");
+                return;
+            }
+            logger.debug(
+                `Handling ingest for '${data.find((q) => q.predicate.equals(SDS.terms.payload))?.object?.value}'`,
+            );
+
+            const extract = extractor.extract_quads(data);
+            const indexOperations: IndexBulkOperations =
+                repository.prepareIndexBulk();
+
+            await handleRecords(extract, repository, indexOperations);
+            await handleRelations(extract, repository, indexOperations);
+            await handleBuckets(extract, repository, indexOperations);
+
+            await repository.ingestIndexBulk(indexOperations);
         }
-        logger.debug(
-            `Handling ingest for '${data.find((q) => q.predicate.equals(SDS.terms.payload))?.object?.value}'`,
-        );
+        ingestData = false;
+        logger.info("[Ingest] Data stream closed.");
+        return await closeRepository();
+    };
 
-        const extract = extractor.extract_quads(data);
-        const indexOperations: IndexBulkOperations =
-            repository.prepareIndexBulk();
+    // Helper to process one iterator
+    const processMetadataIterator = async (iter: any) => {
+        for await (const meta of iter) {
+            logger.debug(`[Ingest] -- processing metadata entry\n${meta}`)
+            await handleMetadata(meta, repository, ingestMetadata)
+        }
+        ingestMetadata = false;
+        return await closeRepository();
+        
+    };
 
-        await handleRecords(extract, repository, indexOperations);
-        await handleRelations(extract, repository, indexOperations);
-        await handleBuckets(extract, repository, indexOperations);
+    processDataIterator(data.strings())
+    processMetadataIterator(metadata.strings())
+}
 
-        await repository.ingestIndexBulk(indexOperations);
-    });
 
-    logger.debug("Attached data handler");
+
+
+type Args = {
+    dataInput: Reader,
+    metadataInput: Reader,
+    database: DBConfig,
+};
+
+export class Ingest extends Processor<Args> {
+    
+    repository: Repository;
+    async init(this: Args & this): Promise<void> {
+        this.repository = await ingestInit(
+            this.dataInput, 
+            this.metadataInput, 
+            this.database
+        )
+        logger.debug('[Ingest] initialized the Ingest processor.')
+    }
+    async transform(this: Args & this): Promise<void> {
+        ingestTransform(this.dataInput, this.metadataInput, this.repository)
+        logger.debug('[Ingest] transform section initialized.')
+    }
+    async produce(this: Args & this): Promise<void> {
+        logger.debug('[Ingest] produce function called.')
+    }
 }

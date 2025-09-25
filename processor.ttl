@@ -1,85 +1,69 @@
-@prefix js: <https://w3id.org/conn/js#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix rdfc: <https://w3id.org/conn/js#>.
 @prefix fno: <https://w3id.org/function/ontology#>.
 @prefix fnom: <https://w3id.org/function/vocabulary/mapping#>.
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
 @prefix : <https://w3id.org/conn#>.
 @prefix sh: <http://www.w3.org/ns/shacl#>.
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
 @prefix dc: <http://purl.org/dc/terms/>.
+@prefix rdfc: <https://w3id.org/rdf-connect#>.
+
+rdfc:Ingest a owl:Class, rdfs:class;
+    rdfc:jsImplementationOf rdfc:Processor;
+    rdfs:label "LDES-server ingestor (mongoDB)";
+    rdfs:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
+    rdfc:file <./lib/index.js>;
+    rdfc:class "Ingest";
+    rdfc:entrypoint <../>.
 
 [ ] a sh:NodeShape;
-  sh:targetClass js:DatabaseConfig;
+  sh:targetClass rdfc:Ingest;
   sh:property [
-    sh:datatype xsd:string;
-    sh:path js:metadata;
+    sh:class rdfc:Reader;
+    sh:path rdfc:dataInput;
+    sh:name "dataInput";
+    sh:maxCount 1;
     sh:minCount 1;
-    sh:maxCount 1;
-    sh:defaultValue "meta";
-    sh:name "metadata";
-    sh:description "Name of the metadata collection";
   ], [
-    sh:datatype xsd:string;
-    sh:path js:data;
+    sh:class rdfc:Reader;
+    sh:path rdfc:metadataInput;
+    sh:name "metadataInput";
+    sh:maxCount 1;
     sh:minCount 1;
-    sh:maxCount 1;
-    sh:name "data";
-    sh:description "Name of the data collection";
   ], [
-    sh:datatype xsd:string;
-    sh:path js:index;
+    sh:class rdfc:Database;
+    sh:path rdfc:database;
+    sh:name "database";
+    sh:maxCount 1;
     sh:minCount 1;
-    sh:maxCount 1;
-    sh:name "index";
-    sh:description "Name of the index collection";
-  ], [
-    sh:datatype xsd:string;
-    sh:path js:url;
-    sh:maxCount 1;
+  ].
+
+
+[ ] a sh:NodeShape;
+  sh:targetClass rdfc:Database;
+  sh:property [
     sh:name "url";
-    sh:description "Collection url used to connect to the mongo database";
-  ].
-
-js:Ingest a js:JsProcess;
-  dc:title "LDES-server ingestor (mongoDB)";
-  dc:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
-  js:file <./lib/index.js>;
-  js:function "ingest";
-  js:location <./>;
-  js:mapping [
-    a fno:Mapping;
-    fno:parameterMapping [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Data Input Channel";
-      fnom:implementationParameterPosition "0"^^xsd:int;
-    ], [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Metadata Input Channel";
-      fnom:implementationParameterPosition "1"^^xsd:int;
-    ], [
-      a fnom:PositionParameterMapping;
-      fnom:functionParameter "Database config";
-      fnom:implementationParameterPosition "2"^^xsd:int;
-    ];
-  ].
-
-[ ] a sh:NodeShape;
-  sh:targetClass js:Ingest;
-  sh:property [
-    sh:class :ReaderChannel;
-    sh:path js:dataInput;
-    sh:name "Data Input Channel";
-    sh:minCount 1;
+    sh:path rdfc:url;
+    sh:datatype xsd:string;
     sh:maxCount 1;
+    sh:minCount 1;
   ], [
-    sh:class :ReaderChannel;
-    sh:path js:metadataInput;
-    sh:name "Metadata Input Channel";
-    sh:minCount 1;
+    sh:name "data";
+    sh:path rdfc:data;
+    sh:datatype xsd:string;
     sh:maxCount 1;
+    sh:minCount 1;
   ], [
-    sh:class js:DatabaseConfig;
-    sh:path js:database;
-    sh:minCount 1;
+    sh:name "metadata";
+    sh:path rdfc:metadata;
+    sh:datatype xsd:string;
     sh:maxCount 1;
-    sh:name "Database config";
+    sh:minCount 1;
+  ], [
+    sh:name "index";
+    sh:path rdfc:index;
+    sh:datatype xsd:string;
+    sh:maxCount 1;
+    sh:minCount 1;
   ].
-
