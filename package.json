@@ -33,6 +33,7 @@
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.35.0",
+    "@rdfc/js-runner": "^2.0.0",
     "@types/n3": "^1.26.0",
     "@types/node": "^22.18.1",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
@@ -51,7 +52,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@rdfc/js-runner": "^2.0.0",
     "@treecg/types": "^0.4.6",
     "async-await-mutex-lock": "^1.0.12",
     "mongodb": "^6.19.0",
