@@ -25,14 +25,15 @@
   "contributors": [
     "Julián Rojas",
     "Pieter Colpaert",
-    "Ieben Smessaert"
+    "Ieben Smessaert",
+    "Ruben Dedecker"
   ],
   "license": "MIT",
   "devDependencies": {
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.36.0",
-    "@rdfc/js-runner": "^1.0.0",
+    "@rdfc/js-runner": "^2.0.0",
     "@types/n3": "^1.26.0",
     "@types/node": "^22.18.6",
     "@typescript-eslint/eslint-plugin": "^8.44.1",

@@ -46,14 +46,21 @@ This processor can be used within data processing pipelines to write a SDS strea
 @prefix js: <https://w3id.org/conn/js#>.
 @prefix sh: <http://www.w3.org/ns/shacl#>.
 
-[ ] a js:Ingest;
-  js:dataInput <inputDataReader>;
-  js:metadataInput <inputMetadataReader>;
-  js:database [
-    js:url <http://myLDESView.org>;
-    js:metadata "METADATA";
-    js:data "DATA";
-    js:index "INDEX";
+
+<> a rdfc:Pipeline;
+   rdfc:consistsOf [
+       rdfc:instantiates rdfc:NodeRunner;
+       rdfc:processor ... , <ingest>, ... ; 
+   ].
+
+<ingest> a rdfc:Ingest;
+  rdfc:dataInput <inputDataReader>;
+  rdfc:metadataInput <inputMetadataReader>;
+  rdfc:database [
+    rdfc:url <http://myLDESView.org>;
+    rdfc:metadata "METADATA";
+    rdfc:data "DATA";
+    rdfc:index "INDEX";
   ].
 ```
 
