@@ -12,7 +12,7 @@
 rdfc:Ingest a owl:Class, rdfs:class;
     rdfc:jsImplementationOf rdfc:Processor;
     rdfs:label "LDES-server ingestor (mongoDB)";
-    rdfs:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see js:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
+    rdfs:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see rdfc:Bucketize).";
     rdfc:file <./lib/index.js>;
     rdfc:class "Ingest";
     rdfc:entrypoint <../>.
