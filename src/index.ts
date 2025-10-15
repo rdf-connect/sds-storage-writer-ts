@@ -212,8 +212,8 @@ export async function ingest(
     metadata: Reader,
     database: DBConfig,
 ) {
-    const repository = await (ingestInit(data, metadata, database))
-    await (ingestTransform(data, metadata, repository))
+    const repository = await (ingestInit(data, metadata, database));
+    await (ingestTransform(data, metadata, repository));
 }
 
 async function ingestInit(
@@ -226,15 +226,15 @@ async function ingestInit(
 
     const dbFragmentations: Promise<Member[]> = repository.findMetadataFragmentations();
     dbFragmentations.then(frag => 
-    logger.debug(
+        logger.debug(
             `Found ${frag.length} fragmentations (${frag.map(
                 (x) => x.id.value,
             )})`,
         )
-    )
+    );
 
     await repository.createIndices();
-    return repository
+    return repository;
 }
 
 function ingestTransform(
@@ -258,7 +258,7 @@ function ingestTransform(
     const extractor = new Extractor();
 
     // Helper to process one iterator
-    const processDataIterator = async (iter: any) => {
+    const processDataIterator = async (iter: AsyncIterable<string>) => {
         for await (const item of iter) {
             const data = maybe_parse(item);
             if (!ingestData) {
@@ -285,18 +285,18 @@ function ingestTransform(
     };
 
     // Helper to process one iterator
-    const processMetadataIterator = async (iter: any) => {
+    const processMetadataIterator = async (iter: AsyncIterable<string>) => {
         for await (const meta of iter) {
-            logger.debug(`[Ingest] -- processing metadata entry\n${meta}`)
-            await handleMetadata(meta, repository, ingestMetadata)
+            logger.debug(`[Ingest] -- processing metadata entry\n${meta}`);
+            await handleMetadata(meta, repository, ingestMetadata);
         }
         ingestMetadata = false;
         return await closeRepository();
         
     };
 
-    processDataIterator(data.strings())
-    processMetadataIterator(metadata.strings())
+    processDataIterator(data.strings());
+    processMetadataIterator(metadata.strings());
 }
 
 
@@ -316,14 +316,14 @@ export class Ingest extends Processor<Args> {
             this.dataInput, 
             this.metadataInput, 
             this.database
-        )
-        logger.debug('[Ingest] initialized the Ingest processor.')
+        );
+        logger.debug("[Ingest] initialized the Ingest processor.");
     }
     async transform(this: Args & this): Promise<void> {
-        ingestTransform(this.dataInput, this.metadataInput, this.repository)
-        logger.debug('[Ingest] transform section initialized.')
+        ingestTransform(this.dataInput, this.metadataInput, this.repository);
+        logger.debug("[Ingest] transform section initialized.");
     }
     async produce(this: Args & this): Promise<void> {
-        logger.debug('[Ingest] produce function called.')
+        logger.debug("[Ingest] produce function called.");
     }
 }
