@@ -53,7 +53,7 @@ This processor can be used within data processing pipelines to write a SDS strea
        rdfc:processor ... , <ingest>, ... ; 
    ].
 
-<ingest> a rdfc:Ingest;
+<ingest> a rdfc:IngestSDS;
   rdfc:dataInput <inputDataReader>;
   rdfc:metadataInput <inputMetadataReader>;
   rdfc:database [

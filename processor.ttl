@@ -9,7 +9,7 @@
 @prefix dc: <http://purl.org/dc/terms/>.
 @prefix rdfc: <https://w3id.org/rdf-connect#>.
 
-rdfc:Ingest a owl:Class, rdfs:class;
+rdfc:IngestSDS a owl:Class, rdfs:class;
     rdfc:jsImplementationOf rdfc:Processor;
     rdfs:label "LDES-server ingestor (mongoDB)";
     rdfs:description "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see rdfc:Bucketize).";
@@ -18,7 +18,7 @@ rdfc:Ingest a owl:Class, rdfs:class;
     rdfc:entrypoint <../>.
 
 [ ] a sh:NodeShape;
-  sh:targetClass rdfc:Ingest;
+  sh:targetClass rdfc:IngestSDS;
   sh:property [
     sh:class rdfc:Reader;
     sh:path rdfc:dataInput;
