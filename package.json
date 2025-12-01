@@ -30,7 +30,7 @@
   "license": "MIT",
   "devDependencies": {
     "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
-    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
     "@rdfc/js-runner": "^1.0.0",
     "@types/n3": "^1.26.1",
@@ -44,7 +44,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "mongodb-memory-server": "^10.3.0",
-    "prettier": "^3.6.2",
+    "prettier": "^3.7.3",
     "ts-patch": "^3.3.0",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
