@@ -1,4 +1,4 @@
-import { DataRecord, DBConfig } from "../index";
+import { DBConfig } from "../index";
 import { env } from "process";
 import { MongoDBRepository } from "./MongoDBRepository";
 import { Member } from "@treecg/types";
@@ -6,6 +6,11 @@ import { AnyBulkWriteOperation } from "mongodb";
 import { TREEFragment } from "../fragmentHelper";
 import { Bucket, Record, Relation } from "../extractor";
 import { RedisRepository } from "./RedisRepository";
+
+export type DataRecord = {
+    id: string;
+    data: string;
+};
 
 export type DataBulkOperations =
     | AnyBulkWriteOperation<DataRecord>[]
