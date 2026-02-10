@@ -3,8 +3,8 @@
 [![Build and tests with Node.js](https://github.com/rdf-connect/sds-storage-writer-ts/actions/workflows/build-test.yml/badge.svg)](https://github.com/rdf-connect/sds-storage-writer-ts/actions/workflows/build-test.yml)  
 [![npm](https://img.shields.io/npm/v/@rdfc/sds-storage-writer-ts.svg?style=popout)](https://npmjs.com/package/@rdfc/sds-storage-writer-ts)
 
-TypeScript [RDF-Connect](https://rdf-connect.github.io/rdfc.github.io/) processor for ingesting **SDS streams** and generating a persistent **Linked Data Event Stream (LDES)**.  
-The processor consumes an SDS stream and its member stream and stores all data, metadata, and fragmentation structures into a supported storage backend.
+TypeScript [RDF-Connect](https://rdf-connect.github.io/rdfc.github.io/) processor for ingesting [SDS streams](https://treecg.github.io/SmartDataStreams-Spec/) and generating persistent [Linked Data Event Stream (LDES)](https://w3id.org/ldes/specification) or in general [TREE fragmentations](https://w3id.org/tree/specification).  
+The processor consumes an SDS stream and stores all data, metadata, and fragmentation structures into a supported storage backend.
 
 Currently supported storage systems:
 - **MongoDB**
@@ -17,8 +17,7 @@ This repository exposes one processor:
 ## [`rdfc:IngestSDS`](https://github.com/rdf-connect/sds-storage-writer-ts/blob/main/processor.ttl)
 
 Processor that ingests an SDS stream to generate a Linked Data Event Stream.  
-Uses `sds:Bucket` to describe fragmentation (see `rdfc:Bucketize`).  
-If `ldes:timestampPath` is declared, the processor automatically creates **time-based fragmentation**.
+Uses `sds:Bucket` to describe fragmentation (see `rdfc:Bucketize`).
 
 This processor stores:
 - SDS members (data)
@@ -69,7 +68,7 @@ in a persistent database backend, making the stream available for **LDES servers
 
 ## Processor Semantics
 
-Given an SDS stream with predefined fragmentation:
+Given an SDS stream with a predefined fragmentation:
 
 ```turtle
 # Member exists
@@ -77,28 +76,28 @@ ex:sample1 a ex:Object;
   ex:x "2";
   ex:y "5".
 
-# Stream membership
-[] sds:stream <bucketizedStream>;
-   sds:payload ex:sample1;
-   sds:bucket <bucket2>.
+sds:DataDescription {
+  [] sds:stream <bucketizedStream>;
+    sds:payload ex:sample1; # Stream membership
+    sds:bucket <bucket2>.
 
-# Bucket relations
-<bucket1> sds:relation [
-  sds:relationType tree:GreaterThanRelation ;
-  sds:relationBucket <bucket2> ;
-  sds:relationValue 1;
-  sds:relationPath ex:x 
-] .
+  # Bucket relations
+  <bucket1> sds:relation [
+    sds:relationType tree:GreaterThanRelation;
+    sds:relationBucket <bucket2>;
+    sds:relationValue 1;
+    sds:relationPath ex:x 
+  ].
+}
+
 ```
 
 The processor will:
-
-- Store the **member data**
-- Store **SDS metadata**
-- Store **bucket definitions**
-- Store **bucket relations**
-- Persist the full fragmentation structure
-- Make the stream available for **LDES querying and traversal**
+- Store the **member data** `ex:sample1`
+- Store **SDS metadata** `sds:DataDescription` and `sds:RemoveDataDescription`
+- Store **bucket definitions** `sds:bucket` and `sds:relationBucket` values  
+- Store **bucket relations** `sds:relation` values
+- Persist the full fragmentation structure in the configured storage system.
 
 ---
 
@@ -154,7 +153,7 @@ MongoDB / Redis
 LDES Server
 ```
 
-This processor acts as the **persistent storage layer** between streaming RDF-Connect pipelines and LDES serving infrastructure.
+This processor acts as the **persistent storage layer** between streaming RDF-Connect pipelines and TREE/LDES serving infrastructure.
 
 ---
 

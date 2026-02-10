@@ -4,62 +4,63 @@
 @prefix sh: <http://www.w3.org/ns/shacl#>.
 
 rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
-    rdfc:file <./lib/index.js>;
-    rdfs:label "LDES-server ingestor";
-    rdfs:comment "Processor that can ingest a SDS stream to generate a Linked Data Event Stream. Uses sds:Bucket to describe the used fragmentation (see rdfc:Bucketize). If ldes:timestampPath is declared it will automatically create a time-based fragmentation.";
-    rdfc:class "IngestSDS";
-    rdfc:entrypoint <./>.
+  rdfc:file <./lib/index.js>;
+  rdfs:label "SDS Storage Writer";
+  rdfs:comment "Processor that can ingest a SDS stream into a given storage system. It uses sds:Bucket to describe the used fragmentation strategy (see rdfc:Bucketize).";
+  rdfc:class "IngestSDS";
+  rdfc:entrypoint <./>.
 
 [ ] a sh:NodeShape;
-    sh:targetClass rdfc:IngestSDS;
-    sh:property [
-        sh:class rdfc:Reader;
-        sh:path rdfc:dataInput;
-        sh:name "data";
-        sh:minCount 1;
-        sh:maxCount 1;
-    ], [
-        sh:class rdfc:Reader;
-        sh:path rdfc:metadataInput;
-        sh:name "metadata";
-        sh:minCount 1;
-        sh:maxCount 1;
-    ], [
-        sh:class rdfc:DatabaseConfig;
-        sh:path rdfc:database;
-        sh:minCount 1;
-        sh:maxCount 1;
-        sh:name "database";
-    ].
+  sh:targetClass rdfc:IngestSDS;
+  sh:property [
+    sh:class rdfc:Reader;
+    sh:path rdfc:dataInput;
+    sh:name "data";
+    sh:minCount 1;
+    sh:maxCount 1;
+  ], [
+    sh:class rdfc:Reader;
+    sh:path rdfc:metadataInput;
+    sh:name "metadata";
+    sh:minCount 1;
+    sh:maxCount 1;
+  ], [
+    sh:class rdfc:DatabaseConfig;
+    sh:path rdfc:database;
+    sh:minCount 1;
+    sh:maxCount 1;
+    sh:name "database";
+  ].
 
 [ ] a sh:NodeShape;
-    sh:targetClass rdfc:DatabaseConfig;
-    sh:property [
-        sh:datatype xsd:string;
-        sh:path rdfc:metadata;
-        sh:minCount 1;
-        sh:maxCount 1;
-        sh:defaultValue "meta";
-        sh:name "metadata";
-        sh:description "Name of the metadata collection";
-    ], [
-        sh:datatype xsd:string;
-        sh:path rdfc:data;
-        sh:minCount 1;
-        sh:maxCount 1;
-        sh:name "data";
-        sh:description "Name of the data collection";
-    ], [
-        sh:datatype xsd:string;
-        sh:path rdfc:index;
-        sh:minCount 1;
-        sh:maxCount 1;
-        sh:name "index";
-        sh:description "Name of the index collection";
-    ], [
-        sh:datatype xsd:string;
-        sh:path rdfc:url;
-        sh:maxCount 1;
-        sh:name "url";
-        sh:description "Collection url used to connect to the mongo database";
-    ].
+  sh:targetClass rdfc:DatabaseConfig;
+  sh:property [
+    sh:datatype xsd:string;
+    sh:path rdfc:metadata;
+    sh:minCount 1;
+    sh:maxCount 1;
+    sh:defaultValue "meta";
+    sh:name "metadata";
+    sh:description "Name of the metadata collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path rdfc:data;
+    sh:minCount 1;
+    sh:maxCount 1;
+    sh:name "data";
+    sh:description "Name of the data collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path rdfc:index;
+    sh:minCount 1;
+    sh:maxCount 1;
+    sh:name "index";
+    sh:description "Name of the index collection";
+  ], [
+    sh:datatype xsd:string;
+    sh:path rdfc:url;
+    sh:maxCount 1;
+    sh:name "url";
+    sh:description "Collection url used to connect to the mongo database";
+  ].
+
