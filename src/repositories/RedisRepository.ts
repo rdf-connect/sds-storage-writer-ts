@@ -235,4 +235,8 @@ export class RedisRepository implements Repository {
             ),
         );
     }
+
+    getStoreType(): string {
+        return "Redis";
+    }
 }

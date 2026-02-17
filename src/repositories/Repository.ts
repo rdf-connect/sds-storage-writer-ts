@@ -69,6 +69,8 @@ export interface Repository {
         value: string | undefined,
         bulk: IndexBulkOperations,
     ): Promise<void>;
+
+    getStoreType(): string;
 }
 
 export function getRepository(dbConfig: DBConfig): Repository {

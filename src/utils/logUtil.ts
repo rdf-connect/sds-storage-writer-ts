@@ -5,8 +5,8 @@ const PROCESSOR_NAME = "sds-storage-writer-ts";
 const consoleTransport = new winston.transports.Console();
 consoleTransport.level =
     process.env.LOG_LEVEL ||
-    process.env.DEBUG?.includes(PROCESSOR_NAME) ||
-    process.env.DEBUG === "*"
+        process.env.DEBUG?.includes(PROCESSOR_NAME) ||
+        process.env.DEBUG === "*"
         ? "debug"
         : "info";
 
@@ -43,7 +43,6 @@ function createLogger(label: string): Logger {
                     message,
                     label: labelInner,
                     timestamp,
-                    metadata: meta,
                 }): string =>
                     `${timestamp} {${PROCESSOR_NAME}} [${labelInner}] ${levelInner}: ${message}`,
             ),

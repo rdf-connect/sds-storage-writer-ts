@@ -251,4 +251,8 @@ export class MongoDBRepository implements Repository {
             },
         });
     }
+
+    getStoreType(): string {
+        return "MongoDB";
+    }
 }

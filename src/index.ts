@@ -20,6 +20,7 @@ export type DBConfig = {
 
 export class IngestSDS extends Processor<IngestSDSArgs> {
     repository: Repository;
+    recordCount: number = 0;
 
     async init(this: IngestSDSArgs & this): Promise<void> {
         this.repository = getRepository(this.database);
@@ -29,12 +30,13 @@ export class IngestSDS extends Processor<IngestSDSArgs> {
             await this.repository.findMetadataFragmentations();
 
         this.logger.debug(
-            `Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
+            `[init] Found ${dbFragmentations.length} fragmentations (${dbFragmentations.map(
                 (x) => x.id.value,
             )})`,
         );
 
         await this.repository.createIndices();
+        this.logger.info("[init] IngestSDS initialized over a " + this.repository.getStoreType() + " data store");
     }
 
     async transform(this: IngestSDSArgs & this): Promise<void> {
@@ -57,19 +59,20 @@ export class IngestSDS extends Processor<IngestSDSArgs> {
         for await (const item of iterable) {
             const data = maybe_parse(item);
 
-            this.logger.debug(
-                `Handling ingest for '${data.find((q) => q.predicate.equals(SDS.terms.payload))?.object?.value}'`,
-            );
+            this.logger.debug(`[processData] Handling ingest for record with payload id: <${data.find(
+                (q) => q.predicate.equals(SDS.terms.payload)
+            )?.object?.value}>`);
 
             const extract = extractor.extract_quads(data);
-            const indexOperations: IndexBulkOperations =
-                this.repository.prepareIndexBulk();
+            const indexOperations: IndexBulkOperations = this.repository.prepareIndexBulk();
             await this.handleRecords(extract, indexOperations);
             await this.handleRelations(extract, indexOperations);
             await this.handleBuckets(extract, indexOperations);
 
             await this.repository.ingestIndexBulk(indexOperations);
+            this.recordCount++;
         }
+        this.logger.info(`[processData] Ingested ${this.recordCount} records`);
     }
 
     async processMetadata(iterable: AsyncIterable<string>): Promise<void> {
