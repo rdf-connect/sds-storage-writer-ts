@@ -40,7 +40,7 @@ uk:node sosa:hosts <http://mumo.be/data/unknown/sensor/temperature>, <http://mum
     sosa:observes "temperature".
 sds:DataDescription {
 _:df_13_1 sds:payload <http://mumo.be/data/2024-01-08T13:34:58.277205944Z/temperature>;
-    sds:stream <https://example.org/ns#>;
+    sds:stream <http://example.org/>;
     sds:bucket <root/UNKNOWN%20-%20Location/UNCONFIGURED/temperature>.
 _:df_13_2 a sds:Relation;
     sds:relationType <https://w3id.org/tree#EqualToRelation>;
@@ -79,19 +79,19 @@ _:n3-26 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://qudt.org/1.1/
 <root> a sds:Bucket;
     sds:immutable "false";
     sds:isRoot "true";
-    sds:stream <https://example.org/ns#>;
+    sds:stream <http://example.org/>;
     sds:relation _:df_13_2.
 <root/UNKNOWN%20-%20Location> a sds:Bucket;
     sds:immutable "false";
-    sds:stream <https://example.org/ns#>;
+    sds:stream <http://example.org/>;
     sds:relation _:df_13_3.
 <root/UNKNOWN%20-%20Location/UNCONFIGURED> a sds:Bucket;
     sds:immutable "false";
-    sds:stream <https://example.org/ns#>;
+    sds:stream <http://example.org/>;
     sds:relation _:df_13_4.
 <root/UNKNOWN%20-%20Location/UNCONFIGURED/temperature> a sds:Bucket;
     sds:immutable "false";
-    sds:stream <https://example.org/ns#>
+    sds:stream <http://example.org/>
 }
   `;
 
@@ -108,10 +108,10 @@ _:n3-26 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://qudt.org/1.1/
         const buckets = extract.getBuckets();
         expect(buckets.length).toBe(4);
         expect(buckets.map((x) => x.streamId)).toEqual([
-            "https://example.org/ns#",
-            "https://example.org/ns#",
-            "https://example.org/ns#",
-            "https://example.org/ns#",
+            "http://example.org/",
+            "http://example.org/",
+            "http://example.org/",
+            "http://example.org/",
         ]);
 
         const relations = extract.getRelations();

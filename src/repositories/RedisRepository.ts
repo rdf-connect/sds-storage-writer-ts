@@ -34,7 +34,7 @@ export class RedisRepository implements Repository {
     }
 
     async close(): Promise<void> {
-        await this.client.disconnect();
+        await this.client.destroy();
 
         this.logger.debug(`Closed connection to ${this.url}`);
     }
@@ -234,5 +234,9 @@ export class RedisRepository implements Repository {
                 { XX: true },
             ),
         );
+    }
+
+    getStoreType(): string {
+        return "Redis";
     }
 }

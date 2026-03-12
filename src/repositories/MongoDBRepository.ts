@@ -1,11 +1,10 @@
-import { Repository } from "./Repository";
+import { DataRecord, Repository } from "./Repository";
 import { AnyBulkWriteOperation, Db, MongoClient } from "mongodb";
 import { getLoggerFor } from "../utils/logUtil";
 import { Lock } from "async-await-mutex-lock";
 import { Member, RelationType } from "@treecg/types";
 import { Parser } from "n3";
 import { TREEFragment } from "../fragmentHelper";
-import { DataRecord } from "../index";
 import { Bucket, Record, Relation } from "../extractor";
 
 export class MongoDBRepository implements Repository {
@@ -251,5 +250,9 @@ export class MongoDBRepository implements Repository {
                 },
             },
         });
+    }
+
+    getStoreType(): string {
+        return "MongoDB";
     }
 }

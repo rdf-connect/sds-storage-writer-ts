@@ -16,9 +16,9 @@ jobs:
         - name: Setup Node.js
           uses: actions/setup-node@v3 # Setup node
           with:
-            node-version: 20.x
+            node-version: 24.x
             cache: 'npm'
 
-        - run: npm ci # Install dependencies
+        - run: npm i # Install dependencies
         - run: npm run build # Build sources
         - run: npm run test # Run tests
