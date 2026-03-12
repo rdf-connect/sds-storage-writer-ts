@@ -16,12 +16,14 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:class rdfc:Reader;
     sh:path rdfc:dataInput;
     sh:name "data";
+    sh:description "The reader IRI that provides the data stream to be ingested.";
     sh:minCount 1;
     sh:maxCount 1;
   ], [
     sh:class rdfc:Reader;
     sh:path rdfc:metadataInput;
     sh:name "metadata";
+    sh:description "The reader IRI that provides the metadata stream to be ingested.";
     sh:minCount 1;
     sh:maxCount 1;
   ], [
@@ -30,6 +32,7 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:minCount 1;
     sh:maxCount 1;
     sh:name "database";
+    sh:description "The configuration of the database to ingest the data into.";
   ].
 
 [ ] a sh:NodeShape;
