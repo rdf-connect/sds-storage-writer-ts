@@ -46,7 +46,7 @@
         "lint-staged": "^16.4.0",
         "mongodb-memory-server": "^11.1.0",
         "prettier": "^3.8.3",
-        "ts-patch": "^3.3.0",
+        "ts-patch": "^4.0.1",
         "tsc-alias": "^1.8.17",
         "typescript": "^5.9.3",
         "vitest": "^4.1.6"
