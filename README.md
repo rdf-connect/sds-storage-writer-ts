@@ -135,7 +135,7 @@ Redis is supported as an alternative backend with the same logical structure, en
 | `rdfc:metadata` | string | no       | Metadata collection name (default: `"meta"`) |
 | `rdfc:data`     | string | yes      | Data collection name     |
 | `rdfc:index`    | string | yes      | Index collection name    |
-| `rdfc:url`      | string | no       | Database connection URL  |
+| `rdfc:url`      | string or IRI | no | Database connection URL  |
 
 ---
 
