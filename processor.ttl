@@ -60,7 +60,8 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:name "index";
     sh:description "Name of the index collection";
   ], [
-    sh:datatype xsd:string;
+    sh:nodeKind sh:IRIOrLiteral;
+    sh:codeType xsd:string;
     sh:path rdfc:url;
     sh:maxCount 1;
     sh:name "url";
