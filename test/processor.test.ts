@@ -42,4 +42,31 @@ describe("processor", () => {
         expect(proc.database.data).toBe("data");
         expect(proc.database.index).toBe("index");
     });
+
+    test("IngestSDS falls back to its default values", async () => {
+        const helper = new ProcHelper<IngestSDS>();
+        await helper.importFile(resolve("./processor.ttl"));
+        await helper.importInline(
+            resolve("./pipeline.ttl"),
+            `
+@prefix rdfc: <https://w3id.org/rdf-connect#>.
+@prefix ex: <http://example.org/>.
+
+ex:ingestor a rdfc:IngestSDS;
+    rdfc:dataInput <data>;
+    rdfc:metadataInput <metadata>;
+    rdfc:database [
+        rdfc:data "data";
+        rdfc:index "index";
+    ].
+`,
+        );
+        helper.getConfig("IngestSDS");
+
+        const proc = <IngestSDS & IngestSDSArgs>(
+            await helper.getProcessor("http://example.org/ingestor")
+        );
+
+        expect(proc.database.metadata).toBe("meta");
+    });
 });
