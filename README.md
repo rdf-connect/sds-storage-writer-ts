@@ -121,15 +121,15 @@ Redis is supported as an alternative backend with the same logical structure, en
 
 ### `rdfcp:IngestSDS`
 
-| Property              | Type                 | Required | Description                   |
-| --------------------- | -------------------- | -------- | ----------------------------- |
-| `rdfcp:dataInput`     | rdfc:Reader          | yes      | SDS member stream             |
-| `rdfcp:metadataInput` | rdfc:Reader          | yes      | SDS metadata stream           |
-| `rdfcp:database`      | rdfcp:DatabaseConfig | yes      | Storage backend configuration |
+| Property              | Type                               | Required | Description                   |
+| --------------------- | ---------------------------------- | -------- | ----------------------------- |
+| `rdfcp:dataInput`     | rdfc:Reader                        | yes      | SDS member stream             |
+| `rdfcp:metadataInput` | rdfc:Reader                        | yes      | SDS metadata stream           |
+| `rdfcp:database`      | rdfcp:IngestSDSDatabaseConfigShape | yes      | Storage backend configuration |
 
 ---
 
-### `rdfcp:DatabaseConfig`
+### `rdfcp:IngestSDSDatabaseConfigShape`
 
 | Property         | Type          | Required | Description                                  |
 | ---------------- | ------------- | -------- | -------------------------------------------- |

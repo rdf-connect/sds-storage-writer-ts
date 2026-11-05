@@ -30,7 +30,7 @@ rdfcp:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:minCount 1;
     sh:maxCount 1;
   ], [
-    sh:class rdfcp:DatabaseConfig;
+    sh:node rdfcp:IngestSDSDatabaseConfigShape;
     sh:path rdfcp:database;
     sh:minCount 1;
     sh:maxCount 1;
@@ -39,8 +39,7 @@ rdfcp:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:description "The configuration of the database to ingest the data into.";
   ].
 
-[ ] a sh:NodeShape;
-  sh:targetClass rdfcp:DatabaseConfig;
+rdfcp:IngestSDSDatabaseConfigShape a sh:NodeShape;
   sh:property [
     sh:datatype xsd:string;
     sh:path rdfcp:metadata;
