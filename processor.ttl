@@ -15,14 +15,16 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
   sh:property [
     sh:class rdfc:Reader;
     sh:path rdfc:dataInput;
-    sh:name "data";
+    sh:codeIdentifier "data";
+    sh:name "Data channel";
     sh:description "The reader IRI that provides the data stream to be ingested.";
     sh:minCount 1;
     sh:maxCount 1;
   ], [
     sh:class rdfc:Reader;
     sh:path rdfc:metadataInput;
-    sh:name "metadata";
+    sh:codeIdentifier "metadata";
+    sh:name "Metadata channel";
     sh:description "The reader IRI that provides the metadata stream to be ingested.";
     sh:minCount 1;
     sh:maxCount 1;
@@ -31,7 +33,8 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:path rdfc:database;
     sh:minCount 1;
     sh:maxCount 1;
-    sh:name "database";
+    sh:codeIdentifier "database";
+    sh:name "Database";
     sh:description "The configuration of the database to ingest the data into.";
   ].
 
@@ -43,28 +46,32 @@ rdfc:IngestSDS rdfc:jsImplementationOf rdfc:Processor;
     sh:minCount 1;
     sh:maxCount 1;
     sh:defaultValue "meta";
-    sh:name "metadata";
+    sh:codeIdentifier "metadata";
+    sh:name "Metadata collection";
     sh:description "Name of the metadata collection";
   ], [
     sh:datatype xsd:string;
     sh:path rdfc:data;
     sh:minCount 1;
     sh:maxCount 1;
-    sh:name "data";
+    sh:codeIdentifier "data";
+    sh:name "Data collection";
     sh:description "Name of the data collection";
   ], [
     sh:datatype xsd:string;
     sh:path rdfc:index;
     sh:minCount 1;
     sh:maxCount 1;
-    sh:name "index";
+    sh:codeIdentifier "index";
+    sh:name "Index collection";
     sh:description "Name of the index collection";
   ], [
     sh:nodeKind sh:IRIOrLiteral;
     sh:codeType xsd:string;
     sh:path rdfc:url;
     sh:maxCount 1;
-    sh:name "url";
+    sh:codeIdentifier "url";
+    sh:name "Database URL";
     sh:description "Collection url used to connect to the mongo database";
   ].
 
