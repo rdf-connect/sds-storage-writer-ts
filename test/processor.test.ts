@@ -6,16 +6,17 @@ import { ReaderInstance } from "@rdfc/js-runner";
 
 const pipeline = `
 @prefix rdfc: <https://w3id.org/rdf-connect#>.
+@prefix rdfcp: <https://w3id.org/rdf-connect/processors#>.
 @prefix ex: <http://example.org/>.
 
-ex:ingestor a rdfc:IngestSDS;
-    rdfc:dataInput <data>;
-    rdfc:metadataInput <metadata>;
-    rdfc:database [
-        rdfc:url "http://me.db";
-        rdfc:metadata "meta";
-        rdfc:data "data";
-        rdfc:index "index";
+ex:ingestor a rdfcp:IngestSDS;
+    rdfcp:dataInput <data>;
+    rdfcp:metadataInput <metadata>;
+    rdfcp:database [
+        rdfcp:url "http://me.db";
+        rdfcp:metadata "meta";
+        rdfcp:data "data";
+        rdfcp:index "index";
     ].
 `;
 
@@ -50,14 +51,15 @@ describe("processor", () => {
             resolve("./pipeline.ttl"),
             `
 @prefix rdfc: <https://w3id.org/rdf-connect#>.
+@prefix rdfcp: <https://w3id.org/rdf-connect/processors#>.
 @prefix ex: <http://example.org/>.
 
-ex:ingestor a rdfc:IngestSDS;
-    rdfc:dataInput <data>;
-    rdfc:metadataInput <metadata>;
-    rdfc:database [
-        rdfc:data "data";
-        rdfc:index "index";
+ex:ingestor a rdfcp:IngestSDS;
+    rdfcp:dataInput <data>;
+    rdfcp:metadataInput <metadata>;
+    rdfcp:database [
+        rdfcp:data "data";
+        rdfcp:index "index";
     ].
 `,
         );
@@ -77,15 +79,16 @@ ex:ingestor a rdfc:IngestSDS;
             resolve("./pipeline.ttl"),
             `
 @prefix rdfc: <https://w3id.org/rdf-connect#>.
+@prefix rdfcp: <https://w3id.org/rdf-connect/processors#>.
 @prefix ex: <http://example.org/>.
 
-ex:ingestor a rdfc:IngestSDS;
-    rdfc:dataInput <data>;
-    rdfc:metadataInput <metadata>;
-    rdfc:database [
-        rdfc:url <mongodb://localhost:27017/ldes>;
-        rdfc:data "data";
-        rdfc:index "index";
+ex:ingestor a rdfcp:IngestSDS;
+    rdfcp:dataInput <data>;
+    rdfcp:metadataInput <metadata>;
+    rdfcp:database [
+        rdfcp:url <mongodb://localhost:27017/ldes>;
+        rdfcp:data "data";
+        rdfcp:index "index";
     ].
 `,
         );
