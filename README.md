@@ -14,7 +14,7 @@ This repository exposes one processor:
 
 ---
 
-## [`rdfc:IngestSDS`](https://github.com/rdf-connect/sds-storage-writer-ts/blob/main/processor.ttl)
+## [`rdfcp:IngestSDS`](https://github.com/rdf-connect/sds-storage-writer-ts/blob/main/processor.ttl)
 
 Processor that ingests an SDS stream to generate a Linked Data Event Stream.  
 Uses `sds:Bucket` to describe fragmentation (see `rdfc:Bucketize`).
@@ -43,6 +43,7 @@ in a persistent database backend, making the stream available for **LDES servers
 
 ```turtle
 @prefix rdfc: <https://w3id.org/rdf-connect#>.
+@prefix rdfcp: <https://w3id.org/rdf-connect/processors#>.
 @prefix owl:  <http://www.w3.org/2002/07/owl#>.
 
 ### Import processor definitions
@@ -53,14 +54,14 @@ in a persistent database backend, making the stream available for **LDES servers
 <metadataInput> a rdfc:Reader.
 
 ### Configure the processor
-<ingestor> a rdfc:IngestSDS;
-    rdfc:dataInput <dataInput>;
-    rdfc:metadataInput <metadataInput>;
-    rdfc:database [
-        rdfc:url "mongodb://localhost:27017/ldes";
-        rdfc:metadata "meta";
-        rdfc:data "data";
-        rdfc:index "index";
+<ingestor> a rdfcp:IngestSDS;
+    rdfcp:dataInput <dataInput>;
+    rdfcp:metadataInput <metadataInput>;
+    rdfcp:database [
+        rdfcp:url "mongodb://localhost:27017/ldes";
+        rdfcp:metadata "meta";
+        rdfcp:data "data";
+        rdfcp:index "index";
     ].
 ```
 
@@ -105,9 +106,9 @@ The processor will:
 
 ### MongoDB
 Data is stored in collections defined by:
-- `rdfc:metadata`
-- `rdfc:data`
-- `rdfc:index`
+- `rdfcp:metadata`
+- `rdfcp:data`
+- `rdfcp:index`
 
 ### Redis
 Redis is supported as an alternative backend with the same logical structure, enabling:
@@ -118,24 +119,24 @@ Redis is supported as an alternative backend with the same logical structure, en
 
 ## Configuration Reference
 
-### `rdfc:IngestSDS`
+### `rdfcp:IngestSDS`
 
-| Property             | Type                | Required | Description                   |
-|----------------------|---------------------|----------|-------------------------------|
-| `rdfc:dataInput`     | rdfc:Reader         | yes      | SDS member stream             |
-| `rdfc:metadataInput` | rdfc:Reader         | yes      | SDS metadata stream           |
-| `rdfc:database`      | rdfc:DatabaseConfig | yes      | Storage backend configuration |
+| Property              | Type                               | Required | Description                   |
+| --------------------- | ---------------------------------- | -------- | ----------------------------- |
+| `rdfcp:dataInput`     | rdfc:Reader                        | yes      | SDS member stream             |
+| `rdfcp:metadataInput` | rdfc:Reader                        | yes      | SDS metadata stream           |
+| `rdfcp:database`      | rdfcp:IngestSDSDatabaseConfigShape | yes      | Storage backend configuration |
 
 ---
 
-### `rdfc:DatabaseConfig`
+### `rdfcp:IngestSDSDatabaseConfigShape`
 
-| Property        | Type   | Required | Description              |
-|-----------------|--------|----------|--------------------------|
-| `rdfc:metadata` | string | no       | Metadata collection name (default: `"meta"`) |
-| `rdfc:data`     | string | yes      | Data collection name     |
-| `rdfc:index`    | string | yes      | Index collection name    |
-| `rdfc:url`      | string or IRI | no | Database connection URL  |
+| Property         | Type          | Required | Description                                  |
+| ---------------- | ------------- | -------- | -------------------------------------------- |
+| `rdfcp:metadata` | string        | no       | Metadata collection name (default: `"meta"`) |
+| `rdfcp:data`     | string        | yes      | Data collection name                         |
+| `rdfcp:index`    | string        | yes      | Index collection name                        |
+| `rdfcp:url`      | string or IRI | no       | Database connection URL                      |
 
 ---
 
@@ -146,7 +147,7 @@ Typical architecture:
 ```
 [SDS Stream] + [Members Stream]
 ↓
-rdfc:IngestSDS
+rdfcp:IngestSDS
 ↓
 MongoDB / Redis
 ↓
