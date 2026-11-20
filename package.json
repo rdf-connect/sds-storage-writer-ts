@@ -29,15 +29,15 @@
     ],
     "license": "MIT",
     "devDependencies": {
-        "@ajuvercr/ts-transformer-inline-file": "^0.2.0",
+        "@ajuvercr/ts-transformer-inline-file": "^0.2.1",
         "@eslint/eslintrc": "^3.3.7",
         "@eslint/js": "^9.39.5",
         "@rdfc/js-runner": "^3.4.2",
         "@treecg/types": "^0.4.6",
         "@types/n3": "^1.26.6",
         "@types/node": "^25.9.9",
-        "@typescript-eslint/eslint-plugin": "^8.72.2",
-        "@typescript-eslint/parser": "^8.72.2",
+        "@typescript-eslint/eslint-plugin": "^8.73.0",
+        "@typescript-eslint/parser": "^8.73.0",
         "@vitest/coverage-v8": "^4.1.12",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
@@ -53,11 +53,11 @@
     },
     "dependencies": {
         "async-await-mutex-lock": "^1.0.12",
-        "mongodb": "^7.9.0",
+        "mongodb": "^7.9.1",
         "n3": "^2.13.12",
         "rdf-canonize": "^5.0.0",
-        "rdf-lens": "^2.2.0",
-        "redis": "^5.12.2",
+        "rdf-lens": "^2.3.0",
+        "redis": "^5.12.4",
         "winston": "^3.19.0"
     }
 }
